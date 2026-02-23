@@ -1,0 +1,38 @@
+Tools and Technologies
+GenMedia
+
+    Notebooks/Apps for Live API 
+    Notebooks/Apps for Image/Video Gen
+    Notebooks/Apps for Computer Use 
+    Language Learning App with Live API (Code/App)
+    MCP servers for Google Cloud Gen Media 
+
+ADK Bidi-streaming Agents 
+
+    A Visual Guide to Real-Time Multimodal AI Agent Development
+    ADK Bidi-streaming in 5 minutes
+    ADK Bidi-streaming development guide
+    Shopper's Concierge II demo
+
+MultiModality Agents
+
+    Avatar Generation with GenAI SDK
+    Multimodal Coordination
+    Multimodal, Graph RAG & Memory Bank
+    Live Bidirectional Streaming Agent 
+    Real-time monitoring agent 
+
+Request credits to build with here.
+ 
+INSPIRATION
+
+    Video Demo of Marketing Ad Creation with Nano Banana Pro 
+    ADK Bidi-streaming Demo
+    Sample App that uses Live API with Gen Media
+
+ 
+Google Developer Groups 
+
+Google Developer Groups (GDGs) bring together developers and technologists to connect, learn, and grow alongside Google's technologies and experts. These groups support innovation and growth in the tech world by providing opportunities to learn, share knowledge, and collaborate. Some GDGs focus on specific subject areas, like applying technology to fields such as science, providing a space for developers with specialized interests to connect and collaborate. Learn more and sign up here
+
+Submissions from active members of a Google Developer Group (GDG) will receive bonus points. See official rules to learn more

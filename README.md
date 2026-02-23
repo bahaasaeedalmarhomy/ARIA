@@ -1,0 +1,1 @@
+Check _bmad-output for docs
