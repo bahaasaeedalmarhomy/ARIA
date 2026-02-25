@@ -1,9 +1,9 @@
 {
   "projects": {
-    "default": "gemini-hackathon-488421"
+    "default": "gemini-hackathon-488421-eff7f"
   },
   "targets": {
-    "gemini-hackathon-488421": {
+    "gemini-hackathon-488421-eff7f": {
       "hosting": {
         "frontend": [
           "gemini-hackathon-488421-eff7f"
@@ -12,4 +12,3 @@
     }
   }
 }
-
