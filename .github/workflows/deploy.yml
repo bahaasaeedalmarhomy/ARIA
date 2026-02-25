@@ -117,21 +117,13 @@ jobs:
           fi
 
       - name: Decode GCP service account key
-        id: gcp-sa
         shell: bash
         run: |
           echo "${{ secrets.GCP_SA_KEY }}" | base64 --decode > "${{ runner.temp }}/gcp-sa.json"
-          {
-            echo "json<<EOF"
-            cat "${{ runner.temp }}/gcp-sa.json"
-            echo "EOF"
-          } >> "$GITHUB_OUTPUT"
 
       - name: Deploy to Firebase Hosting
-        uses: FirebaseExtended/action-hosting-deploy@v0
-        with:
-          repoToken: ${{ secrets.GITHUB_TOKEN }}
-          firebaseServiceAccount: ${{ steps.gcp-sa.outputs.json }}
-          channelId: live
-          projectId: ${{ secrets.FIREBASE_PROJECT_ID }}
-          entryPoint: aria-frontend
+        working-directory: aria-frontend
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/gcp-sa.json
+        run: |
+          npx --yes firebase-tools@13.35.1 deploy --only hosting --project "${{ secrets.FIREBASE_PROJECT_ID }}" --non-interactive
