@@ -121,6 +121,25 @@ jobs:
         run: |
           echo "${{ secrets.GCP_SA_KEY }}" | base64 --decode > "${{ runner.temp }}/gcp-sa.json"
 
+      - name: Ensure Firebase Hosting site exists
+        working-directory: aria-frontend
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/gcp-sa.json
+        shell: bash
+        run: |
+          set -euo pipefail
+          PROJECT_ID="${{ secrets.FIREBASE_PROJECT_ID }}"
+          SITES_JSON="$(mktemp)"
+
+          npx --yes firebase-tools@13.35.1 hosting:sites:list --project "${PROJECT_ID}" --non-interactive --json > "${SITES_JSON}" || true
+          cat "${SITES_JSON}" || true
+
+          if node -e "const fs=require('fs'); const f=process.argv[1]; const raw=fs.readFileSync(f,'utf8').trim(); const j=raw?JSON.parse(raw):{}; const sites=(j.result&&j.result.sites)||(j.sites)||[]; process.exit(sites.length?0:1)" "${SITES_JSON}"; then
+            exit 0
+          fi
+
+          npx --yes firebase-tools@13.35.1 hosting:sites:create "${PROJECT_ID}" --project "${PROJECT_ID}" --non-interactive || true
+
       - name: Deploy to Firebase Hosting
         working-directory: aria-frontend
         env:
