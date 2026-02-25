@@ -121,26 +121,6 @@ jobs:
         run: |
           echo "${{ secrets.GCP_SA_KEY }}" | base64 --decode > "${{ runner.temp }}/gcp-sa.json"
 
-      - name: Ensure Firebase Hosting site exists
-        working-directory: aria-frontend
-        env:
-          GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/gcp-sa.json
-        run: |
-          set -euo pipefail
-          FIREBASE_PID="${{ secrets.FIREBASE_PROJECT_ID }}"
-          SITES_JSON="$(mktemp)"
-
-          npx --yes firebase-tools@13.35.1 hosting:sites:list --project "${FIREBASE_PID}" --non-interactive --json > "${SITES_JSON}"
-
-          if node -e "const fs=require('fs'); const j=JSON.parse(fs.readFileSync(process.argv[1],'utf8')); const sites=(j.result&&j.result.sites)||(j.sites)||[]; process.exit(sites.length?0:1)" "${SITES_JSON}"; then
-            exit 0
-          fi
-
-          npx --yes firebase-tools@13.35.1 hosting:sites:create "${FIREBASE_PID}" --project "${FIREBASE_PID}" --non-interactive
-
-          npx --yes firebase-tools@13.35.1 hosting:sites:list --project "${FIREBASE_PID}" --non-interactive --json > "${SITES_JSON}"
-          node -e "const fs=require('fs'); const j=JSON.parse(fs.readFileSync(process.argv[1],'utf8')); const sites=(j.result&&j.result.sites)||(j.sites)||[]; if(!sites.length){console.error('No Firebase Hosting sites detected after create'); process.exit(1)}" "${SITES_JSON}"
-
       - name: Deploy to Firebase Hosting
         working-directory: aria-frontend
         env:
