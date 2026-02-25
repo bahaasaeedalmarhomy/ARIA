@@ -26,18 +26,24 @@ export function TaskInput() {
         setErrorMessage(null);
         useARIAStore.setState({ isSessionStarting: true });
 
-        const response = await startTask(taskDescription, idToken);
+        try {
+            const response = await startTask(taskDescription, idToken);
 
-        if (response.success && response.data) {
-            useARIAStore.setState({
-                sessionId: response.data.session_id,
-                taskDescription,
-                taskStatus: "running",
-                isSessionStarting: false,
-            });
-        } else {
+            if (response.success && response.data) {
+                useARIAStore.setState({
+                    sessionId: response.data.session_id,
+                    taskDescription,
+                    taskStatus: "running",
+                    isSessionStarting: false,
+                });
+                setTaskDescription("");
+            } else {
+                setErrorMessage(response.error?.message ?? "An unexpected error occurred");
+            }
+        } catch {
+            setErrorMessage("An unexpected error occurred. Please try again.");
+        } finally {
             useARIAStore.setState({ isSessionStarting: false });
-            setErrorMessage(response.error?.message ?? "An unexpected error occurred");
         }
     };
 
@@ -65,7 +71,9 @@ export function TaskInput() {
                 <textarea
                     id="task-input"
                     aria-label="Task description"
+                    aria-describedby={errorMessage ? "task-error" : undefined}
                     rows={3}
+                    maxLength={10000}
                     placeholder="Describe a task for ARIA..."
                     className="w-full bg-zinc-800 border border-zinc-700 rounded-md p-3 text-zinc-100 placeholder:text-zinc-500 resize-none focus:outline-none focus:ring-2 focus:ring-[var(--color-step-active)] text-sm"
                     value={taskDescription}

@@ -43,8 +43,17 @@ describe("TaskInput", () => {
         expect(screen.getByRole("button", { name: "Start Task" })).toBeEnabled();
     });
 
+    it("does not call startTask when textarea is empty", async () => {
+        renderSessionUI();
+
+        fireEvent.click(screen.getByRole("button", { name: "Start Task" }));
+
+        expect(startTask).not.toHaveBeenCalled();
+        expect(useARIAStore.getState().isSessionStarting).toBe(false);
+    });
+
     it("shows loading state while API is in-flight", async () => {
-        vi.mocked(startTask).mockReturnValue(new Promise(() => {}) as never);
+        vi.mocked(startTask).mockReturnValue(new Promise(() => { }) as never);
 
         renderSessionUI();
 
