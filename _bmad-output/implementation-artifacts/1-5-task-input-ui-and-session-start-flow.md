@@ -1,6 +1,6 @@
 # Story 1.5: Task Input UI and Session Start Flow
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -410,6 +410,33 @@ GPT-5.2 (Trae IDE)
 - `aria-frontend/vitest.setup.ts` — **New**
 - `aria-frontend/src/vitest.d.ts` — **New**
 
+## Senior Developer Review (AI)
+
+**Reviewer:** Bahaa — 2026-02-25
+**Verdict:** ✅ Approved (after fixes)
+
+### Findings Fixed (5)
+
+| # | Severity | Issue | Fix Applied |
+|---|----------|-------|-------------|
+| H1 | HIGH | `submitTask()` had no try/catch — `isSessionStarting` could freeze on error | Wrapped in try/catch/finally; `isSessionStarting` always resets |
+| H2 | HIGH | No maxLength on textarea — oversized payloads possible | Added `maxLength={10000}` matching backend limit |
+| M1 | MEDIUM | Missing empty-input guard test (claimed [x] but absent) | Added 6th test: verifies empty textarea doesn't call `startTask()` |
+| M2 | MEDIUM | Textarea not cleared after success — local/store desync risk | `setTaskDescription("")` after successful submission |
+| L1 | LOW | No `aria-describedby` linking textarea to error message | Added conditional `aria-describedby="task-error"` |
+
+### Remaining (not fixed — low priority)
+
+| # | Severity | Issue | Reason |
+|---|----------|-------|--------|
+| M3 | MEDIUM | `bg-surface` in page.tsx relies on CSS var naming convention | Works correctly in Tailwind v4; no code change needed |
+
+### Verification
+
+- ✅ 6/6 tests pass (`npm run test:run`)
+- ✅ Build passes 0 TypeScript errors (`npm run build`)
+
 ## Change Log
 
 - 2026-02-25: Implemented Story 1.5 — task input UI, session start flow wiring to `startTask()`, confirmation banner, and frontend unit tests
+- 2026-02-25: Code review completed — fixed 2 HIGH, 2 MEDIUM, 1 LOW issues. Status → done
