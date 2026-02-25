@@ -1,0 +1,133 @@
+name: Deploy ARIA
+
+on:
+  push:
+    branches: [master]
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  deploy-backend:
+    name: Deploy Backend to Cloud Run
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Decode GCP service account key
+        id: gcp-sa
+        shell: bash
+        run: |
+          echo "${{ secrets.GCP_SA_KEY }}" | base64 --decode > "${{ runner.temp }}/gcp-sa.json"
+          {
+            echo "json<<EOF"
+            cat "${{ runner.temp }}/gcp-sa.json"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ steps.gcp-sa.outputs.json }}
+
+      - name: Setup Google Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
+
+      - name: Build Docker image
+        run: |
+          docker build \
+            -t us-central1-docker.pkg.dev/${{ secrets.GCP_PROJECT }}/aria-backend/aria-backend:${{ github.sha }} \
+            ./aria-backend
+
+      - name: Push Docker image
+        run: |
+          docker push \
+            us-central1-docker.pkg.dev/${{ secrets.GCP_PROJECT }}/aria-backend/aria-backend:${{ github.sha }}
+
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy aria-backend \
+            --image us-central1-docker.pkg.dev/${{ secrets.GCP_PROJECT }}/aria-backend/aria-backend:${{ github.sha }} \
+            --region us-central1 \
+            --platform managed \
+            --allow-unauthenticated \
+            --service-account aria-backend-sa@${{ secrets.GCP_PROJECT }}.iam.gserviceaccount.com \
+            --min-instances 1 \
+            --concurrency 1 \
+            --memory 4Gi \
+            --cpu 2 \
+            --port 8080 \
+            --set-secrets="GEMINI_API_KEY=GEMINI_API_KEY:latest" \
+            --set-env-vars="GCP_PROJECT=${{ secrets.GCP_PROJECT }},FIREBASE_PROJECT_ID=${{ secrets.FIREBASE_PROJECT_ID }},GCS_BUCKET_NAME=${{ secrets.GCS_BUCKET_NAME }},CORS_ORIGIN=https://${{ secrets.FIREBASE_PROJECT_ID }}.web.app"
+
+      - name: Verify deployment health
+        run: |
+          CLOUD_RUN_URL=$(gcloud run services describe aria-backend \
+            --region us-central1 \
+            --format='value(status.url)')
+          curl --fail --retry 3 --retry-delay 5 "${CLOUD_RUN_URL}/healthz"
+
+  deploy-frontend:
+    name: Deploy Frontend to Firebase Hosting
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: aria-frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: aria-frontend
+        run: npm ci
+
+      - name: Build frontend
+        working-directory: aria-frontend
+        env:
+          NEXT_PUBLIC_BACKEND_URL: ${{ secrets.NEXT_PUBLIC_BACKEND_URL }}
+          NEXT_PUBLIC_FIREBASE_API_KEY: ${{ secrets.NEXT_PUBLIC_FIREBASE_API_KEY }}
+          NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ secrets.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN }}
+          NEXT_PUBLIC_FIREBASE_PROJECT_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_PROJECT_ID }}
+          NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: ${{ secrets.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET }}
+          NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }}
+          NEXT_PUBLIC_FIREBASE_APP_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_APP_ID }}
+        run: npm run build
+
+      - name: Verify static export
+        working-directory: aria-frontend
+        run: test -f out/index.html || (echo "ERROR: out/index.html not found — static export failed" && exit 1)
+
+      - name: Decode GCP service account key
+        id: gcp-sa
+        shell: bash
+        run: |
+          echo "${{ secrets.GCP_SA_KEY }}" | base64 --decode > "${{ runner.temp }}/gcp-sa.json"
+          {
+            echo "json<<EOF"
+            cat "${{ runner.temp }}/gcp-sa.json"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Deploy to Firebase Hosting
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ steps.gcp-sa.outputs.json }}
+          channelId: live
+          projectId: ${{ secrets.FIREBASE_PROJECT_ID }}
+          entryPoint: aria-frontend
