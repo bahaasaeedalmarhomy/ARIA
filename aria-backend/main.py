@@ -3,11 +3,11 @@ import os
 from contextlib import asynccontextmanager
 
 import firebase_admin
+from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from dotenv import load_dotenv
 
 load_dotenv()
 
@@ -69,4 +69,8 @@ async def health_check():
 
 # Routers
 from routers.task_router import router as task_router  # noqa: E402
+
 app.include_router(task_router)
+from handlers import sse_router  # noqa: E402
+
+app.include_router(sse_router)

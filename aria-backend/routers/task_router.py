@@ -1,13 +1,14 @@
 import logging
+from typing import Optional
 
 import firebase_admin.auth as firebase_auth
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
-from typing import Optional
 
-from services.session_service import create_session, update_session_status
 from services.planner_service import run_planner
+from services.session_service import create_session, update_session_status
+from services.sse_service import emit_event
 
 logger = logging.getLogger(__name__)
 
@@ -86,6 +87,11 @@ async def start_task(request: Request, body: StartTaskRequest):
             await update_session_status(session_id, "failed")
         except Exception:
             logger.warning("Failed to update session %s status to 'failed'", session_id)
+        # Emit task_failed SSE event so connected clients receive the failure
+        try:
+            emit_event(session_id, "task_failed", {"reason": "Planner agent failed to produce a step plan"})
+        except Exception:
+            logger.warning("Failed to emit task_failed SSE event for session %s", session_id)
         return _error_response("PLANNER_ERROR", "Planner agent failed to produce a step plan", 500)
 
     # 6. Store step plan in Firestore and update status to "plan_ready"
@@ -99,7 +105,21 @@ async def start_task(request: Request, body: StartTaskRequest):
         logger.warning("Failed to update session %s with step plan — returning plan anyway", session_id)
         warnings.append("Step plan storage in Firestore failed — plan returned but session may be incomplete")
 
-    # 7. Return canonical success envelope with session data + step plan
+    # 7. Emit plan_ready SSE event — within same request lifecycle to meet NFR4 (<500ms)
+    try:
+        emit_event(
+            session_id,
+            "plan_ready",
+            {
+                "steps": step_plan.get("steps", []),
+                "task_summary": step_plan.get("task_summary", ""),
+            },
+        )
+    except Exception:
+        logger.warning("Failed to emit plan_ready SSE event for session %s", session_id)
+        warnings.append("SSE plan_ready event emission failed — frontend may not receive live update")
+
+    # 8. Return canonical success envelope with session data + step plan
     response_data = {
         **session_data,
         "step_plan": step_plan,
