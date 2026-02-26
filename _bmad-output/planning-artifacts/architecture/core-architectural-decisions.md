@@ -158,7 +158,7 @@ src/
 # .github/workflows/deploy.yml
 on:
   push:
-    branches: [main]
+    branches: [master]
 jobs:
   deploy-backend:
     runs-on: ubuntu-latest
@@ -219,4 +219,4 @@ CORS_ORIGIN  # Firebase Hosting URL
 - Firestore `uid` from Firebase Anonymous Auth → passed as header to backend → backend scopes Firestore writes to that uid
 
 ---
-
+
