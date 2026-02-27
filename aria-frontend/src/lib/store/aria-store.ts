@@ -9,6 +9,7 @@ import type {
 
 interface SessionSlice {
   sessionId: string | null;
+  streamUrl: string | null;
   taskStatus: TaskStatus;
   taskDescription: string;
   uid: string | null; // Firebase Anonymous Auth uid
@@ -40,6 +41,7 @@ type ARIAStore = SessionSlice & VoiceSlice & ThinkingPanelSlice;
 export const ARIA_INITIAL_STATE = {
   // Session slice
   sessionId: null,
+  streamUrl: null,
   taskStatus: "idle" as TaskStatus,
   taskDescription: "",
   uid: null,

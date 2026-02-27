@@ -50,6 +50,7 @@ export function TaskInput() {
 
         useARIAStore.setState({
           sessionId: response.data.session_id,
+          streamUrl: response.data.stream_url,
           taskDescription,
           taskStatus: "running",
           isSessionStarting: false,

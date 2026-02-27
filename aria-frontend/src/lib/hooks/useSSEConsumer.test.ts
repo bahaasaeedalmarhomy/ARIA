@@ -213,4 +213,12 @@ describe("useSSEConsumer", () => {
 
     expect(useARIAStore.getState().connectionStatus).toBe("error");
   });
+  
+  it("closes EventSource on unmount (cleanup)", () => {
+    useARIAStore.setState({ sessionId: "test-session" });
+    const { unmount } = renderHook(() => useSSEConsumer());
+    expect(MockEventSource.instance).not.toBeNull();
+    unmount();
+    expect(MockEventSource.instance?.close).toHaveBeenCalled();
+  });
 });

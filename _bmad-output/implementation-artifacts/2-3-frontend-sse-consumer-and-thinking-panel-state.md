@@ -1,6 +1,6 @@
 # Story 2.3: Frontend SSE Consumer and Thinking Panel State
 
-Status: review
+Status: done
 
 ## Story
 
@@ -82,7 +82,37 @@ so that all thinking panel components react to live agent events without prop dr
 
 ## Dev Notes
 
-### ⚠️ CRITICAL: SSE Race Condition — Plan from REST, Not from SSE
+## Code Review Findings — 2026-02-27
+
+**Summary**
+- Story: 2-3-frontend-sse-consumer-and-thinking-panel-state
+- Git vs Story Discrepancies: 0
+- Issues Found: 1 High, 3 Medium, 2 Low
+
+**Critical/High**
+- EventSource ignored stream_url from POST /api/task/start; violated AC #1. Fixed by storing stream_url in state and using it in the SSE hook. See [useSSEConsumer.ts](file:///d:/Programming%20Projects/gemini-hackathon/aria-frontend/src/lib/hooks/useSSEConsumer.ts#L23-L28), [TaskInput.tsx](file:///d:/Programming%20Projects/gemini-hackathon/aria-frontend/src/components/session/TaskInput.tsx#L51-L57), and [aria-store.ts](file:///d:/Programming%20Projects/gemini-hackathon/aria-frontend/src/lib/store/aria-store.ts#L41-L49).
+
+**Medium**
+- Reconnect backoff used attempt-based scaling; AC #3 requires constant 1-second backoff. Fixed to 1000ms. See [useSSEConsumer.ts](file:///d:/Programming%20Projects/gemini-hackathon/aria-frontend/src/lib/hooks/useSSEConsumer.ts#L44-L53).
+- stream_url may be absolute or relative. Added support for both forms to prevent origin issues. See [useSSEConsumer.ts](file:///d:/Programming%20Projects/gemini-hackathon/aria-frontend/src/lib/hooks/useSSEConsumer.ts#L23-L28).
+- Missing lifecycle test for SSE cleanup on unmount. Added test verifying EventSource.close() on unmount. See [useSSEConsumer.test.ts](file:///d:/Programming%20Projects/gemini-hackathon/aria-frontend/src/lib/hooks/useSSEConsumer.test.ts).
+
+**Low**
+- Redundant isSessionStarting resets in TaskInput; harmless but noted for future cleanup.
+- Tests do not explicitly cover plan hydration from REST step_plan; recommended follow-up.
+
+**Fixes Applied**
+- Implemented stream_url usage end-to-end (store, TaskInput, SSE hook).
+- Aligned reconnection behavior to 1-second constant backoff for max 5 attempts.
+- Added SSE cleanup test.
+- Lint and tests pass:
+  - Lint: pass
+  - Tests: pass (16 tests; useSSEConsumer + TaskInput)
+
+**Status and Tracking**
+- Story status set to done.
+- Sprint tracking synced: 2-3-frontend-sse-consumer-and-thinking-panel-state → done.
+
 
 The backend runs the Planner **synchronously** inside `POST /api/task/start` and emits the `plan_ready` SSE event BEFORE returning the HTTP response. By the time the frontend receives the response and opens the `EventSource`, the `plan_ready` event has already been emitted and is gone.
 

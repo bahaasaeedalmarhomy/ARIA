@@ -10,16 +10,21 @@ const BACKEND_URL =
 
 export function useSSEConsumer() {
   const sessionId = useARIAStore((state) => state.sessionId);
+  const streamUrl = useARIAStore((state) => state.streamUrl);
   const eventSourceRef = useRef<EventSource | null>(null);
   const reconnectAttemptsRef = useRef(0);
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    if (!sessionId) return;
+    if (!sessionId && !streamUrl) return;
 
     const connect = () => {
       useARIAStore.setState({ connectionStatus: "connecting" });
-      const es = new EventSource(`${BACKEND_URL}/api/stream/${sessionId}`);
+      const url =
+        streamUrl
+          ? (streamUrl.startsWith("http") ? streamUrl : `${BACKEND_URL}${streamUrl}`)
+          : `${BACKEND_URL}/api/stream/${sessionId}`;
+      const es = new EventSource(url);
       eventSourceRef.current = es;
 
       es.onopen = () => {
@@ -44,7 +49,7 @@ export function useSSEConsumer() {
           return;
         }
         useARIAStore.setState({ connectionStatus: "reconnecting" });
-        reconnectTimeoutRef.current = setTimeout(connect, 1000 * attempt);
+        reconnectTimeoutRef.current = setTimeout(connect, 1000);
       };
     };
 
@@ -56,7 +61,7 @@ export function useSSEConsumer() {
         clearTimeout(reconnectTimeoutRef.current);
       reconnectAttemptsRef.current = 0;
     };
-  }, [sessionId]);
+  }, [sessionId, streamUrl]);
 }
 
 function handleSSEEvent(event: SSEEvent) {
