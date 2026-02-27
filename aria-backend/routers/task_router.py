@@ -1,4 +1,5 @@
 import logging
+import asyncio
 from typing import Optional
 
 import firebase_admin.auth as firebase_auth
@@ -53,7 +54,8 @@ async def start_task(request: Request, body: StartTaskRequest):
     # 2. Verify Firebase ID token
     try:
         decoded = firebase_auth.verify_id_token(id_token)
-    except Exception:
+    except Exception as exc:
+        logger.warning("verify_id_token failed: %s", exc)
         return _error_response("UNAUTHORIZED", "Invalid or missing token", 401)
 
     uid = decoded["uid"]
@@ -105,19 +107,30 @@ async def start_task(request: Request, body: StartTaskRequest):
         logger.warning("Failed to update session %s with step plan — returning plan anyway", session_id)
         warnings.append("Step plan storage in Firestore failed — plan returned but session may be incomplete")
 
-    # 7. Emit plan_ready SSE event — within same request lifecycle to meet NFR4 (<500ms)
     try:
-        emit_event(
-            session_id,
-            "plan_ready",
-            {
-                "steps": step_plan.get("steps", []),
-                "task_summary": step_plan.get("task_summary", ""),
-            },
-        )
+        async def _emit():
+            await asyncio.sleep(0.2)
+            emit_event(
+                session_id,
+                "plan_ready",
+                {
+                    "steps": [],
+                    "task_summary": step_plan.get("task_summary", ""),
+                },
+            )
+            steps = step_plan.get("steps", [])
+            for step in steps:
+                await asyncio.sleep(0.1)
+                emit_event(
+                    session_id,
+                    "step_planned",
+                    {"step": step},
+                    step_index=step.get("step_index"),
+                )
+        asyncio.create_task(_emit())
     except Exception:
-        logger.warning("Failed to emit plan_ready SSE event for session %s", session_id)
-        warnings.append("SSE plan_ready event emission failed — frontend may not receive live update")
+        logger.warning("Failed to schedule plan_ready SSE event for session %s", session_id)
+        warnings.append("SSE plan_ready event scheduling failed — frontend may not receive live update")
 
     # 8. Return canonical success envelope with session data + step plan
     response_data = {

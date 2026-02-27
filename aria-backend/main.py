@@ -27,8 +27,13 @@ async def lifespan(app: FastAPI):
     # On Cloud Run: ADC provided by aria-backend-sa service account attachment.
     # Locally: run `gcloud auth application-default login` first.
     if not firebase_admin._apps:
-        firebase_admin.initialize_app()
-        logger.info("Firebase Admin SDK initialized")
+        project_id = os.getenv("FIREBASE_PROJECT_ID")
+        if project_id:
+            firebase_admin.initialize_app(options={"projectId": project_id})
+            logger.info("Firebase Admin SDK initialized (project: %s)", project_id)
+        else:
+            firebase_admin.initialize_app()
+            logger.info("Firebase Admin SDK initialized (ADC default project)")
 
     try:
         from tools.playwright_computer import smoketest_playwright

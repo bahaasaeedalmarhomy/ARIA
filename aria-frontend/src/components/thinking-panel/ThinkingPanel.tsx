@@ -52,7 +52,7 @@ export function ThinkingPanel() {
       </div>
 
       <div ref={viewportRef} className="flex-1">
-        <ScrollArea className="flex-1 px-4 py-3">
+        <ScrollArea className="h-full px-4 py-3">
           {taskSummary && (
             <div id="task-summary" className="mb-3 pb-3 border-b border-border-aria">
               <p className="text-xs text-text-secondary leading-relaxed">

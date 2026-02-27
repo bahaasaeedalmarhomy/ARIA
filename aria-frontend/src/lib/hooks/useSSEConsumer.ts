@@ -11,6 +11,7 @@ const BACKEND_URL =
 export function useSSEConsumer() {
   const sessionId = useARIAStore((state) => state.sessionId);
   const streamUrl = useARIAStore((state) => state.streamUrl);
+  const idToken = useARIAStore((state) => state.idToken);
   const eventSourceRef = useRef<EventSource | null>(null);
   const reconnectAttemptsRef = useRef(0);
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -20,10 +21,13 @@ export function useSSEConsumer() {
 
     const connect = () => {
       useARIAStore.setState({ connectionStatus: "connecting" });
-      const url =
+      const base =
         streamUrl
           ? (streamUrl.startsWith("http") ? streamUrl : `${BACKEND_URL}${streamUrl}`)
           : `${BACKEND_URL}/api/stream/${sessionId}`;
+      const tokenParam = idToken ? `token=${encodeURIComponent(idToken)}` : "";
+      const separator = base.includes("?") ? "&" : "?";
+      const url = tokenParam ? `${base}${separator}${tokenParam}` : base;
       const es = new EventSource(url);
       eventSourceRef.current = es;
 
@@ -61,7 +65,7 @@ export function useSSEConsumer() {
         clearTimeout(reconnectTimeoutRef.current);
       reconnectAttemptsRef.current = 0;
     };
-  }, [sessionId, streamUrl]);
+  }, [sessionId, streamUrl, idToken]);
 }
 
 function handleSSEEvent(event: SSEEvent) {
@@ -85,6 +89,18 @@ function handleSSEEvent(event: SSEEvent) {
       useARIAStore.setState((state) => {
         const step = state.steps.find((s) => s.step_index === event.step_index);
         if (step) step.status = "active";
+      });
+      break;
+    }
+    case "step_planned": {
+      const payload = event.payload as { step: PlanStep };
+      useARIAStore.setState((state) => {
+        // Avoid duplicates if reconnect triggers replays
+        const exists = state.steps.some((s) => s.step_index === payload.step.step_index);
+        if (!exists) {
+          state.steps.push({ ...payload.step, status: "pending" as StepStatus });
+          state.panelStatus = "plan_ready";
+        }
       });
       break;
     }

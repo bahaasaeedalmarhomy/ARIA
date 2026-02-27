@@ -12,7 +12,6 @@ import {
 } from "@/components/ui/dialog";
 import { startTask } from "@/lib/api/task";
 import { useARIAStore, resetAllSlices } from "@/lib/store/aria-store";
-import type { StepStatus } from "@/types/aria";
 
 export function TaskInput() {
   const { idToken, taskStatus, isSessionStarting } = useARIAStore();
@@ -22,13 +21,11 @@ export function TaskInput() {
   const [confirmOpen, setConfirmOpen] = useState(false);
 
   const submitTask = async () => {
-    if (!idToken) return;
-
     setErrorMessage(null);
     useARIAStore.setState({ isSessionStarting: true });
 
     try {
-      const response = await startTask(taskDescription, idToken);
+      const response = await startTask(taskDescription, idToken ?? "");
 
       if (response.success && response.data) {
         // Reset store first, preserving auth
@@ -38,13 +35,12 @@ export function TaskInput() {
           idToken: useARIAStore.getState().idToken,
         });
 
-        // Hydrate from REST response if available
+        // Use REST task_summary for immediate reassurance; steps arrive via SSE
         if (response.data.step_plan) {
-          const { steps, task_summary } = response.data.step_plan;
+          const { task_summary } = response.data.step_plan;
           useARIAStore.setState({
-            steps: steps.map((s) => ({ ...s, status: "pending" as StepStatus })),
             taskSummary: task_summary,
-            panelStatus: "plan_ready",
+            panelStatus: "planning",
           });
         }
 
@@ -111,7 +107,7 @@ export function TaskInput() {
                 <Button
                     id="start-task-btn"
                     type="submit"
-                    disabled={!idToken || Boolean(isSessionStarting)}
+                    disabled={Boolean(isSessionStarting)}
                 >
                     {isSessionStarting ? (
                         <span className="flex items-center gap-2">
@@ -144,7 +140,7 @@ export function TaskInput() {
                             type="button"
                             variant="destructive"
                             onClick={handleConfirmStartNew}
-                            disabled={!idToken || Boolean(isSessionStarting)}
+                            disabled={Boolean(isSessionStarting)}
                         >
                             Confirm
                         </Button>

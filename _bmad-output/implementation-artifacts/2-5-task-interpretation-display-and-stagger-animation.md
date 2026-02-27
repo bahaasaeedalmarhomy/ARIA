@@ -369,6 +369,12 @@ Claude Sonnet 4.6
 - Review fixes (AI): Standardized ThinkingPanel to named export and updated import in `app/page.tsx`.
 - Review fixes (AI): Removed redundant `role="listitem"` from `StepItem` root to rely on native `<li>` semantics.
 - Review fixes (AI): Associated task summary with step list via `aria-describedby="task-summary"` on `<ul>`.
+- Issue fix (2026 Feb 27): Start Task button was incorrectly disabled due to gating on `idToken`. Updated `TaskInput.tsx` to enable the button regardless of auth initialization and surface canonical API errors under the input. Aligns with Story 1.5 acceptance criteria (“button is visible and enabled on page load”).
+- Issue fix (2026 Feb 27): Backend Firebase Admin SDK bound to `FIREBASE_PROJECT_ID` for consistent token verification across environments. Updated `aria-backend/main.py` to initialize with `options={"projectId": FIREBASE_PROJECT_ID}` when env var is set.
+- Issue fix (2026 Feb 27): SSE stream authentication fixed by appending `?token=<idToken>` to the stream URL in `useSSEConsumer.ts`, matching backend handler support for token query param. Eliminates 401 on `GET /api/stream/{session_id}`.
+- Issue fix (2026 Feb 27): Introduced slight delay before broadcasting `plan_ready` so the client can subscribe to SSE first. Scheduled emission via `asyncio.create_task` in `aria-backend/routers/task_router.py`.
+- Issue fix (2026 Feb 27): Thinking Panel scrollability fixed by ensuring the `ScrollArea` viewport uses `overflow-y-auto` and the panel fills container height. Updated `aria-frontend/src/components/ui/scroll-area.tsx` and `ThinkingPanel.tsx`.
+- Issue fix (2026 Feb 27): Lint/type safety improvements — `useSSEConsumer` dependency array includes `idToken`, and minor const preference fixes to satisfy ESLint.
 
 ### File List
 - aria-frontend/src/app/globals.css
