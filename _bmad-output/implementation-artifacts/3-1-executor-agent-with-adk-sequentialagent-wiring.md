@@ -1,6 +1,6 @@
 # Story 3.1: Executor Agent with ADK SequentialAgent Wiring
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -395,3 +395,4 @@ Claude Sonnet 4.6 (GitHub Copilot)
 ## Change Log
 
 - 2026-03-02: Implemented Story 3.1 — executor agent with ADK SequentialAgent wiring. Added `PlaywrightComputer` (BaseComputer subclass), `BargeInException`, `EXECUTOR_SYSTEM_PROMPT`, `executor_agent` LlmAgent, `build_executor_context`, `handle_task_complete`, `get_cancel_flag`/`reset_cancel_flag`, `audit_writer.update_session_status`. All 12 unit tests pass.
+- 2026-03-02: **Code Review (AI)** — Fixed 1 HIGH + 3 MEDIUM + 3 LOW issues. HIGH: Added 4 tests for `handle_task_complete()` (AC4 coverage gap). MEDIUM: Added `_check_cancel()` between retries in `click()`, between inter-await calls in `type_text_at()` and `type_text()`. LOW: Removed dead `import os`, `load_dotenv()` from `playwright_computer.py` and `executor_agent.py`. All 16 tests pass (was 12). Pre-existing failure `test_task_router_emits_plan_ready_on_success` unchanged (async timing issue from Story 1.4).

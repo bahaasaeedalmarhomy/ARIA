@@ -1,11 +1,7 @@
 import asyncio
-import os
 from typing import Literal, Optional
-from dotenv import load_dotenv
 
 from google.adk.tools.computer_use.base_computer import BaseComputer, ComputerEnvironment, ComputerState
-
-load_dotenv()
 
 # Playwright launch args required for containerized environments:
 # --no-sandbox: required because Docker containers run as root
@@ -173,9 +169,12 @@ class PlaywrightComputer(BaseComputer):
         """Click at (x, y) then type text; optionally press Enter after."""
         self._check_cancel()
         await self.page.mouse.click(x, y)
+        self._check_cancel()
         if clear_before_typing:
             await self.page.keyboard.press("Control+a")
+            self._check_cancel()
         await self.page.keyboard.type(text, delay=30)
+        self._check_cancel()
         if press_enter:
             await self.page.keyboard.press("Enter")
         state = await self._state()
@@ -310,6 +309,7 @@ class PlaywrightComputer(BaseComputer):
                 if attempt == 2:
                     raise
                 await asyncio.sleep(0.3)
+                self._check_cancel()
         state = await self._state()
         self._check_cancel()
         return state
@@ -318,6 +318,7 @@ class PlaywrightComputer(BaseComputer):
         """Click a selector then type text at 30ms/char delay."""
         self._check_cancel()
         await self.page.click(selector)
+        self._check_cancel()
         await self.page.keyboard.type(text, delay=30)
         state = await self._state()
         self._check_cancel()

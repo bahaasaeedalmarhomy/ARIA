@@ -11,14 +11,11 @@ is fully wired in Story 3.2+ by the executor service.
 """
 import json
 
-from dotenv import load_dotenv
 from google.adk.agents import LlmAgent
 from google.adk.tools.computer_use.computer_use_toolset import ComputerUseToolset
 
 from prompts.executor_system import EXECUTOR_SYSTEM_PROMPT
 from tools.playwright_computer import PlaywrightComputer
-
-load_dotenv()
 
 # Module-level PlaywrightComputer instance for agent definition.
 # Per-session computers are created by the executor service in Story 3.2+.
