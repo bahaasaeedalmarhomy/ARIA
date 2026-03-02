@@ -1,6 +1,6 @@
 # Story 3.3: Screenshot Capture, GCS Upload, and Step SSE Events
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -380,6 +380,7 @@ Claude Sonnet 4.6 (GitHub Copilot)
 - 2026-03-02: Created `ScreenshotViewer` component
 - 2026-03-02: Extended `StepItem` to render `ScreenshotViewer` for completed steps with screenshots
 - 2026-03-02: Added 5 unit tests for `gcs_service`, 3 new SSE tests for `executor_service`, 4 frontend tests for `ScreenshotViewer`, 3 new frontend tests for `StepItem`
+- 2026-03-02: **Code review fixes** — H1: wrapped post-step `pc.screenshot()` in try/except to prevent crash on Playwright failure; M1: replaced deprecated `asyncio.get_event_loop()` with `asyncio.get_running_loop()` in gcs_service; M2: updated test_executor_service.py docstring to include Story 3.3 AC coverage
 
 ### File List
 

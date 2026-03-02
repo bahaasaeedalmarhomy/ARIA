@@ -1,9 +1,13 @@
 """
-Unit tests for Story 3.2: Playwright Browser Actions — executor_service.run_executor.
+Unit tests for executor_service.run_executor.
 
-AC coverage map:
-  AC 1–5 (browser actions)  : Covered by test_playwright_computer.py (PlaywrightComputer methods)
-  AC 6 (error handling)     : All tests below
+Story 3.2 AC coverage:
+  AC 1-5 (browser actions)  : Covered by test_playwright_computer.py (PlaywrightComputer methods)
+  AC 6 (error handling)     : Tests 1-5 below
+
+Story 3.3 AC coverage:
+  AC 1 (step_start SSE)     : Test 6 — step_start emitted per step with correct payload
+  AC 2 (step_complete SSE)  : Test 7 — step_complete with screenshot_url; Test 8 — empty URL maps to None
 
 Tests:
   1. run_executor — successful completion calls handle_task_complete once
@@ -11,6 +15,9 @@ Tests:
   3. run_executor — retry: action raises twice then succeeds; execution continues
   4. run_executor — retries exhausted: step_error SSE emitted; executor stops
   5. run_executor — pc.stop() always called in finally block (even on exception)
+  6. run_executor — step_start emitted for each step with correct payload (Story 3.3 AC 1)
+  7. run_executor — step_complete emitted with screenshot_url (Story 3.3 AC 2)
+  8. run_executor — step_complete with empty screenshot_url uses None (Story 3.3 AC 2)
 """
 import asyncio
 import pytest

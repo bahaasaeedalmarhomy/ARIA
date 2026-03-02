@@ -154,7 +154,12 @@ async def run_executor(session_id: str, step_plan: dict) -> None:
 
             if last_exc is None:
                 # Step succeeded — capture post-action screenshot, upload, emit step_complete (AC: 2)
-                post_screenshot_bytes = await pc.screenshot()
+                # Wrap screenshot capture in try/except: screenshot failure must NOT crash execution
+                try:
+                    post_screenshot_bytes = await pc.screenshot()
+                except Exception:
+                    logger.warning("Post-step screenshot failed for session %s step %d", session_id, current_step_index)
+                    post_screenshot_bytes = b""
                 screenshot_url = await upload_screenshot(
                     session_id, current_step_index, post_screenshot_bytes
                 )
@@ -181,8 +186,9 @@ async def run_executor(session_id: str, step_plan: dict) -> None:
                 )
                 continue  # move to next step
 
+            # All attempts exhausted (last_exc is always non-None here after continue above)
             if last_exc is not None:
-                # All attempts exhausted — emit step_error and stop execution
+                # Emit step_error and stop execution
                 logger.error(
                     "Executor step %d exhausted retries for session %s: %s",
                     current_step_index,

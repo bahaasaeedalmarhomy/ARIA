@@ -35,7 +35,7 @@ async def upload_screenshot(session_id: str, step_index: int, image_bytes: bytes
 
     blob_path = f"sessions/{session_id}/steps/{step_index:04d}.png"
     try:
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         url: str = await loop.run_in_executor(None, _upload_sync, blob_path, image_bytes)
         return url
     except Exception as exc:  # noqa: BLE001 — non-fatal; log and continue
