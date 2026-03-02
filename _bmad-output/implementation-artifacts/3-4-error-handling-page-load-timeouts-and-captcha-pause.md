@@ -1,6 +1,6 @@
 # Story 3.4: Error Handling, Page Load Timeouts, and CAPTCHA Pause
 
-Status: in-progress
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -26,38 +26,38 @@ So that I can intervene and continue rather than having to restart from scratch.
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Add `detect_captcha()` helper to `aria-backend/tools/playwright_computer.py` (AC: 3)
-  - [ ] Add `async def detect_captcha(self) -> bool:` method to `PlaywrightComputer`
-  - [ ] Implementation: use `await self.page.content()` to get full HTML; check for captcha keyword patterns using `re.search` (case-insensitive): `r"captcha|recaptcha|hCaptcha|cf-challenge|challenge-form|turnstile"`.
-  - [ ] Also check page title: `title = await self.page.title()` and apply same regex
-  - [ ] Return `True` if any match found, `False` otherwise
-  - [ ] Wrap in `try/except` — return `False` on any error (non-fatal; do not crash execution)
-  - [ ] Do NOT import `re` at top of file if not already there — add it
+- [x] Task 1: Add `detect_captcha()` helper to `aria-backend/tools/playwright_computer.py` (AC: 3)
+  - [x] Add `async def detect_captcha(self) -> bool:` method to `PlaywrightComputer`
+  - [x] Implementation: use `await self.page.content()` to get full HTML; check for captcha keyword patterns using `re.search` (case-insensitive): `r"captcha|recaptcha|hCaptcha|cf-challenge|challenge-form|turnstile"`.
+  - [x] Also check page title: `title = await self.page.title()` and apply same regex
+  - [x] Return `True` if any match found, `False` otherwise
+  - [x] Wrap in `try/except` — return `False` on any error (non-fatal; do not crash execution)
+  - [x] Do NOT import `re` at top of file if not already there — add it
 
-- [ ] Task 2: Create `aria-backend/services/input_queue_service.py` — per-session user input queue (AC: 4)
-  - [ ] Module-level `_input_queues: dict[str, asyncio.Queue[str]] = {}`
-  - [ ] `def get_input_queue(session_id: str) -> asyncio.Queue[str]:` — creates queue if absent, returns it
-  - [ ] `def put_user_input(session_id: str, value: str) -> None:` — `get_input_queue(session_id).put_nowait(value)`
-  - [ ] `def clear_input_queue(session_id: str) -> None:` — `_input_queues.pop(session_id, None)`
-  - [ ] Pattern mirrors the barge-in cancel flag dict in `session_service.py` (module-level dict, lazily initialized per session)
+- [x] Task 2: Create `aria-backend/services/input_queue_service.py` — per-session user input queue (AC: 4)
+  - [x] Module-level `_input_queues: dict[str, asyncio.Queue[str]] = {}`
+  - [x] `def get_input_queue(session_id: str) -> asyncio.Queue[str]:` — creates queue if absent, returns it
+  - [x] `def put_user_input(session_id: str, value: str) -> None:` — `get_input_queue(session_id).put_nowait(value)`
+  - [x] `def clear_input_queue(session_id: str) -> None:` — `_input_queues.pop(session_id, None)`
+  - [x] Pattern mirrors the barge-in cancel flag dict in `session_service.py` (module-level dict, lazily initialized per session)
 
-- [ ] Task 3: Add `POST /api/task/{session_id}/input` endpoint to `aria-backend/routers/task_router.py` (AC: 4, 6)
-  - [ ] Define `class UserInputRequest(BaseModel): value: str = Field(..., min_length=1)`
-  - [ ] `@router.post("/{session_id}/input")` route
-  - [ ] Body: `UserInputRequest`; no auth check required (session_id is the ownership token for now — same pattern as `/interrupt`)
-  - [ ] Call `put_user_input(session_id, body.value)` from `input_queue_service`
-  - [ ] Return `{"success": True, "data": {"queued": True}, "error": None}` on success
-  - [ ] Return `404` with canonical error envelope if session_id is unknown (check `get_input_queue` — if queue doesn't exist yet and no running session, return error)
-  - [ ] Import `put_user_input` from `services.input_queue_service`
+- [x] Task 3: Add `POST /api/task/{session_id}/input` endpoint to `aria-backend/routers/task_router.py` (AC: 4, 6)
+  - [x] Define `class UserInputRequest(BaseModel): value: str = Field(..., min_length=1)`
+  - [x] `@router.post("/{session_id}/input")` route
+  - [x] Body: `UserInputRequest`; no auth check required (session_id is the ownership token for now — same pattern as `/interrupt`)
+  - [x] Call `put_user_input(session_id, body.value)` from `input_queue_service`
+  - [x] Return `{"success": True, "data": {"queued": True}, "error": None}` on success
+  - [x] Return `404` with canonical error envelope if session_id is unknown (check `get_input_queue` — if queue doesn't exist yet and no running session, return error)
+  - [x] Import `put_user_input` from `services.input_queue_service`
 
-- [ ] Task 4: Refactor step retry logic in `aria-backend/services/executor_service.py` to handle 3 error classes differently (AC: 1, 2, 3, 4)
-  - [ ] Add imports:
+- [x] Task 4: Refactor step retry logic in `aria-backend/services/executor_service.py` to handle 3 error classes differently (AC: 1, 2, 3, 4)
+  - [x] Add imports:
     ```python
     import re
     from playwright.async_api import TimeoutError as PlaywrightTimeoutError
     from services.input_queue_service import get_input_queue, clear_input_queue
     ```
-  - [ ] **PlaywrightTimeoutError handling (AC: 1)**: In the per-attempt `except` block, add a specific check _before_ the generic handler:
+  - [x] **PlaywrightTimeoutError handling (AC: 1)**: In the per-attempt `except` block, add a specific check _before_ the generic handler:
     ```python
     except PlaywrightTimeoutError as exc:
         # Non-retryable: page load timeout is deterministic — retrying wastes 15s each time
@@ -77,15 +77,15 @@ So that I can intervene and continue rather than having to restart from scratch.
             logger.warning("Failed to update session %s status to 'error'", session_id)
         return
     ```
-    - [ ] This `except PlaywrightTimeoutError` MUST appear BEFORE the generic `except Exception` in the attempt loop
-    - [ ] Do NOT include in the `_MAX_STEP_ATTEMPTS` retry loop — break out immediately
-  - [ ] **Gemini API retry with 1s backoff (AC: 2)**: Wrap `runner.run_async(...)` in a dedicated retry helper. Add a module-level constant `_GEMINI_MAX_RETRIES = 2` and `_GEMINI_BACKOFF_SECONDS = 1.0`. Detect Gemini API errors by checking for `google.api_core.exceptions.GoogleAPICallError` or `google.generativeai` exceptions:
+    - [x] This `except PlaywrightTimeoutError` MUST appear BEFORE the generic `except Exception` in the attempt loop
+    - [x] Do NOT include in the `_MAX_STEP_ATTEMPTS` retry loop — break out immediately
+  - [x] **Gemini API retry with 1s backoff (AC: 2)**: Wrap `runner.run_async(...)` in a dedicated retry helper. Add a module-level constant `_GEMINI_MAX_RETRIES = 2` and `_GEMINI_BACKOFF_SECONDS = 1.0`. Detect Gemini API errors by checking for `google.api_core.exceptions.GoogleAPICallError` or `google.generativeai` exceptions:
     ```python
     from google.api_core import exceptions as gapi_exceptions
     ```
-    - [ ] In the existing `except Exception as exc:` branch (after `PlaywrightTimeoutError` is already handled), check: `if isinstance(exc, gapi_exceptions.GoogleAPICallError):` → set a `gemini_error_count` counter per step; if `gemini_error_count > _GEMINI_MAX_RETRIES` → emit `task_failed` SSE and return. If within retries → `await asyncio.sleep(_GEMINI_BACKOFF_SECONDS)` before next attempt.
-    - [ ] Generic non-Gemini exceptions → existing retry with `_RETRY_DELAY_SECONDS` unchanged.
-  - [ ] **CAPTCHA detection (AC: 3)**: After the `last_exc is None` check (step succeeded), before emitting `step_complete`, call CAPTCHA detection:
+    - [x] In the existing `except Exception as exc:` branch (after `PlaywrightTimeoutError` is already handled), check: `if isinstance(exc, gapi_exceptions.GoogleAPICallError):` → set a `gemini_error_count` counter per step; if `gemini_error_count > _GEMINI_MAX_RETRIES` → emit `task_failed` SSE and return. If within retries → `await asyncio.sleep(_GEMINI_BACKOFF_SECONDS)` before next attempt.
+    - [x] Generic non-Gemini exceptions → existing retry with `_RETRY_DELAY_SECONDS` unchanged.
+  - [x] **CAPTCHA detection (AC: 3)**: After the `last_exc is None` check (step succeeded), before emitting `step_complete`, call CAPTCHA detection:
     ```python
     if await pc.detect_captcha():
         logger.warning("CAPTCHA detected at step %d session %s", current_step_index, session_id)
@@ -115,14 +115,14 @@ So that I can intervene and continue rather than having to restart from scratch.
             return
         continue  # Retry this step after user has solved the CAPTCHA
     ```
-    - [ ] CAPTCHA check happens after `last_exc is None` (step action completed) but before `step_complete` SSE
-    - [ ] After the input arrives, `continue` loops back to re-run the step from the top of the `for step in steps:` loop body — this re-takes a screenshot and re-runs the ADK step. **IMPORTANT**: to re-run the SAME step, we must NOT `continue` the outer `for step in steps` loop. Instead:
+    - [x] CAPTCHA check happens after `last_exc is None` (step action completed) but before `step_complete` SSE
+    - [x] After the input arrives, `continue` loops back to re-run the step from the top of the `for step in steps:` loop body — this re-takes a screenshot and re-runs the ADK step. **IMPORTANT**: to re-run the SAME step, we must NOT `continue` the outer `for step in steps` loop. Instead:
       - Use an inner `while True:` or `retry_after_input` flag that restarts the attempt block for the same step.
       - Simpler: after `user_input = await input_queue.get()`, reset `last_exc = Exception("re-evaluating")` and `break` to exit the attempt loop, then check: if the outer `if last_exc is None` check fails, it falls into the retry-step-error path which emits `step_error`. That's wrong.
       - **Correct approach**: extract captcha-pause-and-resume into a helper. After pausing and getting input, re-start the current step's retry loop from scratch by using a `should_retry_step` boolean flag. Set it before `continue`, and in the step outer loop check it.
       - **Simpler still**: wrap the entire `for attempt in range(_MAX_STEP_ATTEMPTS)` block and the post-success logic in a `while True:` with a `step_done = False` flag. When input received, take a new screenshot and loop back.
-      - [ ] See the Dev Notes section for the exact `while True:` restructure pattern.
-  - [ ] **Input resume after step_error (AC: 4)**: After emitting `step_error` (exhausted retries), await user input from queue before returning. If input arrives, retry the current step (reset attempt count). If `asyncio.TimeoutError` (300s), emit `task_failed` and return.
+      - [x] See the Dev Notes section for the exact `while True:` restructure pattern.
+  - [x] **Input resume after step_error (AC: 4)**: After emitting `step_error` (exhausted retries), await user input from queue before returning. If input arrives, retry the current step (reset attempt count). If `asyncio.TimeoutError` (300s), emit `task_failed` and return.
     ```python
     # After emit step_error, wait for user input
     input_queue = get_input_queue(session_id)
@@ -140,15 +140,15 @@ So that I can intervene and continue rather than having to restart from scratch.
             pass
         return
     ```
-  - [ ] In the `finally` block, add `clear_input_queue(session_id)` after `await pc.stop()` to clean up the queue
+  - [x] In the `finally` block, add `clear_input_queue(session_id)` after `await pc.stop()` to clean up the queue
 
-- [ ] Task 5: Update `aria-frontend/src/store/ariaStore.ts` (or equivalent Zustand store) to add `awaiting_input` state (AC: 5, 6)
-  - [ ] Add field `awaitingInputMessage: string | null` to the `thinkingPanelSlice` (or whichever slice owns `taskStatus`)
-  - [ ] Add reset of `awaitingInputMessage` to `null` in the initial state and reset action
-  - [ ] The `taskStatus: "awaiting_input"` type already exists in `aria.ts`
+- [x] Task 5: Update `aria-frontend/src/store/ariaStore.ts` (or equivalent Zustand store) to add `awaiting_input` state (AC: 5, 6)
+  - [x] Add field `awaitingInputMessage: string | null` to the `thinkingPanelSlice` (or whichever slice owns `taskStatus`)
+  - [x] Add reset of `awaitingInputMessage` to `null` in the initial state and reset action
+  - [x] The `taskStatus: "awaiting_input"` type already exists in `aria.ts`
 
-- [ ] Task 6: Add `awaiting_input` SSE event handler in `aria-frontend/src/lib/hooks/useSSEConsumer.ts` (AC: 5)
-  - [ ] In the `switch (event.event_type)` block, add:
+- [x] Task 6: Add `awaiting_input` SSE event handler in `aria-frontend/src/lib/hooks/useSSEConsumer.ts` (AC: 5)
+  - [x] In the `switch (event.event_type)` block, add:
     ```typescript
     case "awaiting_input": {
       const payload = event.payload as { reason?: string; message?: string };
@@ -159,25 +159,25 @@ So that I can intervene and continue rather than having to restart from scratch.
       break;
     }
     ```
-  - [ ] Place after the existing `"task_failed"` case
-  - [ ] Also add reset of `awaitingInputMessage` in the `"task_complete"` and `"task_failed"` handlers (set to `null`)
+  - [x] Place after the existing `"task_failed"` case
+  - [x] Also add reset of `awaitingInputMessage` in the `"task_complete"` and `"task_failed"` handlers (set to `null`)
 
-- [ ] Task 7: Create `aria-frontend/src/components/thinking-panel/InputRequestBanner.tsx` (AC: 5, 6)
-  - [ ] Component props: `{ message: string; sessionId: string; onSubmitted?: () => void }`
-  - [ ] Render a `<div>` with class `mt-3 p-3 rounded-md border border-amber-500/40 bg-amber-950/20`
-  - [ ] Inside: amber warning icon (`⚠`), the `message` text in `text-sm text-amber-300`
-  - [ ] Below: a `<textarea>` (single-row, expandable) with placeholder "Type your response..." + Geist Mono font class
-  - [ ] "Send" button: calls `POST /api/task/{sessionId}/input` with `{value: userInput}` via `fetch`
-  - [ ] Loading state: disable button + show spinner while fetch is in-flight
-  - [ ] On success: call `onSubmitted?.()` which triggers parent to set `taskStatus` back to `"running"` and clear `awaitingInputMessage`; clear the input field
-  - [ ] On error: show error message below the textarea in rose text; re-enable button
-  - [ ] `data-testid="input-request-banner"` on the wrapper div
-  - [ ] Export as named export `InputRequestBanner` and default export
+- [x] Task 7: Create `aria-frontend/src/components/thinking-panel/InputRequestBanner.tsx` (AC: 5, 6)
+  - [x] Component props: `{ message: string; sessionId: string; onSubmitted?: () => void }`
+  - [x] Render a `<div>` with class `mt-3 p-3 rounded-md border border-amber-500/40 bg-amber-950/20`
+  - [x] Inside: amber warning icon (`⚠`), the `message` text in `text-sm text-amber-300`
+  - [x] Below: a `<textarea>` (single-row, expandable) with placeholder "Type your response..." + Geist Mono font class
+  - [x] "Send" button: calls `POST /api/task/{sessionId}/input` with `{value: userInput}` via `fetch`
+  - [x] Loading state: disable button + show spinner while fetch is in-flight
+  - [x] On success: call `onSubmitted?.()` which triggers parent to set `taskStatus` back to `"running"` and clear `awaitingInputMessage`; clear the input field
+  - [x] On error: show error message below the textarea in rose text; re-enable button
+  - [x] `data-testid="input-request-banner"` on the wrapper div
+  - [x] Export as named export `InputRequestBanner` and default export
 
-- [ ] Task 8: Integrate `InputRequestBanner` into thinking panel (AC: 5, 6)
-  - [ ] In `ThinkingPanel.tsx`, import `InputRequestBanner`
-  - [ ] Read `awaitingInputMessage` and `taskStatus` from `useARIAStore`
-  - [ ] Render conditionally after the `StepItem` list:
+- [x] Task 8: Integrate `InputRequestBanner` into thinking panel (AC: 5, 6)
+  - [x] In `ThinkingPanel.tsx`, import `InputRequestBanner`
+  - [x] Read `awaitingInputMessage` and `taskStatus` from `useARIAStore`
+  - [x] Render conditionally after the `StepItem` list:
     ```tsx
     {taskStatus === "awaiting_input" && awaitingInputMessage && (
       <InputRequestBanner
@@ -187,25 +187,25 @@ So that I can intervene and continue rather than having to restart from scratch.
       />
     )}
     ```
-  - [ ] `sessionId` is already available in `ThinkingPanel` via props or store
+  - [x] `sessionId` is already available in `ThinkingPanel` via props or store
 
-- [ ] Task 9: Write backend tests (AC: 1, 2, 3, 4)
-  - [ ] `aria-backend/tests/test_playwright_computer.py` — add `test_detect_captcha_true_when_recaptcha_in_page` (mock `page.content()` to return `"<div class='g-recaptcha'></div>"`), `test_detect_captcha_false_when_normal_page`, `test_detect_captcha_returns_false_on_exception`
-  - [ ] `aria-backend/tests/test_input_queue_service.py` — new file: test `get_input_queue` creates queue, `put_user_input` populates it, `clear_input_queue` removes it, consecutive `get_input_queue` calls return same queue instance
-  - [ ] `aria-backend/tests/test_executor_service.py` — add:
+- [x] Task 9: Write backend tests (AC: 1, 2, 3, 4)
+  - [x] `aria-backend/tests/test_playwright_computer.py` — add `test_detect_captcha_true_when_recaptcha_in_page` (mock `page.content()` to return `"<div class='g-recaptcha'></div>"`), `test_detect_captcha_false_when_normal_page`, `test_detect_captcha_returns_false_on_exception`
+  - [x] `aria-backend/tests/test_input_queue_service.py` — new file: test `get_input_queue` creates queue, `put_user_input` populates it, `clear_input_queue` removes it, consecutive `get_input_queue` calls return same queue instance
+  - [x] `aria-backend/tests/test_executor_service.py` — add:
     - `test_run_executor_page_load_timeout` — patch `runner.run_async` to raise `playwright.async_api.TimeoutError`; assert `step_error` SSE emitted with message "Page did not load within 15 seconds" and session status updated to "error"
     - `test_run_executor_gemini_api_error_retries_twice` — patch `runner.run_async` to raise `gapi_exceptions.ServiceUnavailable("rate limit")` twice then succeed; assert retry happened with 1s backoff (mock `asyncio.sleep`) and `step_complete` emitted on 3rd attempt
     - `test_run_executor_gemini_api_error_exhausted_emits_task_failed` — patch `runner.run_async` to always raise `gapi_exceptions.ServiceUnavailable`; assert `task_failed` SSE emitted (not `step_error`)
     - `test_run_executor_captcha_detected_emits_awaiting_input` — patch `pc.detect_captcha` to return `True`; patch `input_queue.get` to return user input immediately; assert `awaiting_input` SSE emitted, then step retried, then `step_complete`
     - All existing tests for `task_paused`, `step_error`, `step_complete`, `step_start` must continue passing — do NOT break them
 
-- [ ] Task 10: Write frontend tests (AC: 5, 6)
-  - [ ] `InputRequestBanner.test.tsx` — renders with message text; `data-testid="input-request-banner"` present; send button calls `POST /api/task/{sessionId}/input`; shows loading state while fetching; calls `onSubmitted` on success; shows error text on fetch failure
-  - [ ] `useSSEConsumer.test.ts` — add test: `awaiting_input` event sets `taskStatus: "awaiting_input"` and `awaitingInputMessage`
-  - [ ] Follow existing test patterns: Vitest + React Testing Library + `vi.spyOn(global, "fetch")`
+- [x] Task 10: Write frontend tests (AC: 5, 6)
+  - [x] `InputRequestBanner.test.tsx` — renders with message text; `data-testid="input-request-banner"` present; send button calls `POST /api/task/{sessionId}/input`; shows loading state while fetching; calls `onSubmitted` on success; shows error text on fetch failure
+  - [x] `useSSEConsumer.test.ts` — add test: `awaiting_input` event sets `taskStatus: "awaiting_input"` and `awaitingInputMessage`
+  - [x] Follow existing test patterns: Vitest + React Testing Library + `vi.spyOn(global, "fetch")`
 
-- [ ] Task 11: Git commit
-  - [ ] `git add -A && git commit -m "feat(story-3.4): error handling, page load timeouts, and CAPTCHA pause"`
+- [x] Task 11: Git commit
+  - [x] `git add -A && git commit -m "feat(story-3.4): error handling, page load timeouts, and CAPTCHA pause"`
 
 ## Dev Notes
 
@@ -421,4 +421,25 @@ claude-sonnet-4-5 (GitHub Copilot)
 
 ### Completion Notes List
 
+- All 13 files created/modified as specified. All 117 backend tests pass (27 new for this story); all 88 frontend tests pass (13 new for this story).
+- `detect_captcha()` uses `re.search` on full page HTML + title; wrapped in try/except so it is always non-fatal.
+- `input_queue_service.py` uses a module-level `asyncio.Queue` dict, mirroring the barge-in cancel-flag pattern from `session_service.py`.
+- `awaiting_input` SSE emit is done in `run_executor` (caller) rather than inside `_wait_for_user_input`, so the event fires in the correct coroutine context before `await queue.get()`.
+- `useSSEConsumer.ts` switch statement closing brace was missing after adding the new `awaiting_input` case; fixed before tests ran.
+- Story committed at `bcb109a` on `master`.
+
 ### File List
+
+- `aria-backend/tools/playwright_computer.py` — added `detect_captcha()` + `import re`
+- `aria-backend/services/input_queue_service.py` — **CREATED** per-session async input queue
+- `aria-backend/routers/task_router.py` — added `POST /{session_id}/input` endpoint + `UserInputRequest` model
+- `aria-backend/services/executor_service.py` — refactored retry loop; 3-tier error classification; input-pause-resume; CAPTCHA detection; queue cleanup in finally
+- `aria-frontend/src/store/ariaStore.ts` — added `awaitingInputMessage: string | null` field
+- `aria-frontend/src/lib/hooks/useSSEConsumer.ts` — added `awaiting_input` case + reset on `task_complete`/`task_failed`
+- `aria-frontend/src/components/thinking-panel/InputRequestBanner.tsx` — **CREATED**
+- `aria-frontend/src/components/thinking-panel/ThinkingPanel.tsx` — integrated `InputRequestBanner`
+- `aria-backend/tests/test_playwright_computer.py` — added CAPTCHA detection tests
+- `aria-backend/tests/test_input_queue_service.py` — **CREATED**
+- `aria-backend/tests/test_executor_service.py` — added timeout/retry/captcha/input-resume tests; patched existing tests with `detect_captcha` mock
+- `aria-frontend/src/components/thinking-panel/InputRequestBanner.test.tsx` — **CREATED**
+- `aria-frontend/src/lib/hooks/useSSEConsumer.test.ts` — added `awaiting_input` handler test
