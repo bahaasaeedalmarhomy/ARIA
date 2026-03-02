@@ -75,13 +75,12 @@ async def test_run_executor_success_calls_handle_task_complete():
         patch("services.executor_service.emit_event") as mock_emit,
         patch("services.executor_service.build_executor_context", return_value="ctx"),
         patch("services.executor_service.handle_task_complete", new_callable=AsyncMock) as mock_htc,
+        patch("services.executor_service.upload_screenshot", new_callable=AsyncMock, return_value="https://storage.googleapis.com/bucket/sessions/sess/steps/0000.png"),
     ):
-        # Wire up the mock computer
         mock_pc = AsyncMock()
         mock_pc.screenshot = AsyncMock(return_value=b"\x89PNG")
         MockPC.return_value = mock_pc
 
-        # Wire up mock session service
         mock_svc = AsyncMock()
         mock_svc.create_session = AsyncMock(return_value=mock_adk_session)
         MockSessionSvc.return_value = mock_svc
@@ -130,6 +129,7 @@ async def test_run_executor_barge_in_emits_task_paused_and_skips_handle_complete
         patch("services.executor_service.build_executor_context", return_value="ctx"),
         patch("services.executor_service.handle_task_complete", new_callable=AsyncMock) as mock_htc,
         patch("services.executor_service.update_session_status", new_callable=AsyncMock) as mock_update_status,
+        patch("services.executor_service.upload_screenshot", new_callable=AsyncMock, return_value=""),
     ):
         mock_pc = AsyncMock()
         mock_pc.screenshot = AsyncMock(return_value=b"\x89PNG")
@@ -194,6 +194,7 @@ async def test_run_executor_retry_succeeds_on_third_attempt():
         patch("services.executor_service.emit_event") as mock_emit,
         patch("services.executor_service.build_executor_context", return_value="ctx"),
         patch("services.executor_service.handle_task_complete", new_callable=AsyncMock) as mock_htc,
+        patch("services.executor_service.upload_screenshot", new_callable=AsyncMock, return_value=""),
         # Suppress retry sleep to keep tests fast
         patch("services.executor_service.asyncio.sleep", new_callable=AsyncMock),
     ):
@@ -249,6 +250,7 @@ async def test_run_executor_exhausted_retries_emits_step_error():
         patch("services.executor_service.build_executor_context", return_value="ctx"),
         patch("services.executor_service.handle_task_complete", new_callable=AsyncMock) as mock_htc,
         patch("services.executor_service.update_session_status", new_callable=AsyncMock) as mock_update_status,
+        patch("services.executor_service.upload_screenshot", new_callable=AsyncMock, return_value=""),
         patch("services.executor_service.asyncio.sleep", new_callable=AsyncMock),
     ):
         mock_pc = AsyncMock()
@@ -305,6 +307,7 @@ async def test_run_executor_pc_stop_called_in_finally():
         patch("services.executor_service.build_executor_context", return_value="ctx"),
         patch("services.executor_service.handle_task_complete", new_callable=AsyncMock),
         patch("services.executor_service.update_session_status", new_callable=AsyncMock),
+        patch("services.executor_service.upload_screenshot", new_callable=AsyncMock, return_value=""),
         patch("services.executor_service.asyncio.sleep", new_callable=AsyncMock),
     ):
         mock_pc = AsyncMock()
@@ -332,3 +335,163 @@ async def test_run_executor_pc_stop_called_in_finally():
 
     # pc.stop() MUST have been called despite the exception
     mock_pc.stop.assert_called_once()
+
+
+# ─────────────────────────────── Test 6 ──────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_run_executor_emits_step_start_for_each_step():
+    """
+    step_start SSE is emitted for each step with correct step_index, action_type,
+    description, and confidence before the ADK runner executes the step (AC: 1).
+    """
+    mock_adk_session = _make_mock_adk_session()
+
+    with (
+        patch("services.executor_service.PlaywrightComputer") as MockPC,
+        patch("services.executor_service.LlmAgent"),
+        patch("services.executor_service.ComputerUseToolset"),
+        patch("services.executor_service.InMemorySessionService") as MockSessionSvc,
+        patch("services.executor_service.Runner") as MockRunner,
+        patch("services.executor_service.emit_event") as mock_emit,
+        patch("services.executor_service.build_executor_context", return_value="ctx"),
+        patch("services.executor_service.handle_task_complete", new_callable=AsyncMock),
+        patch("services.executor_service.upload_screenshot", new_callable=AsyncMock, return_value=""),
+    ):
+        mock_pc = AsyncMock()
+        mock_pc.screenshot = AsyncMock(return_value=b"\x89PNG")
+        MockPC.return_value = mock_pc
+
+        mock_svc = AsyncMock()
+        mock_svc.create_session = AsyncMock(return_value=mock_adk_session)
+        MockSessionSvc.return_value = mock_svc
+
+        async def _no_events(**kwargs):
+            return
+            yield
+
+        mock_runner = MagicMock()
+        mock_runner.run_async = MagicMock(side_effect=lambda **kw: _no_events(**kw))
+        MockRunner.return_value = mock_runner
+
+        from services.executor_service import run_executor
+        await run_executor(_SESSION_ID, _SAMPLE_STEP_PLAN)
+
+    # Extract all step_start calls
+    step_start_calls = [c for c in mock_emit.call_args_list if c.args[1] == "step_start"]
+    assert len(step_start_calls) == len(_SAMPLE_STEP_PLAN["steps"]), (
+        f"Expected {len(_SAMPLE_STEP_PLAN['steps'])} step_start events, got {len(step_start_calls)}"
+    )
+
+    for i, step in enumerate(_SAMPLE_STEP_PLAN["steps"]):
+        payload = step_start_calls[i].args[2]
+        assert payload["step_index"] == step["step_index"]
+        assert payload["action_type"] == step["action"]
+        assert payload["description"] == step["description"]
+        assert payload["confidence"] == step["confidence"]
+
+
+# ─────────────────────────────── Test 7 ──────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_run_executor_emits_step_complete_with_screenshot_url():
+    """
+    step_complete SSE is emitted after each successful step with screenshot_url
+    returned by upload_screenshot (AC: 2).
+    """
+    mock_adk_session = _make_mock_adk_session()
+    expected_url = "https://storage.googleapis.com/bucket/sessions/sess/steps/0000.png"
+
+    with (
+        patch("services.executor_service.PlaywrightComputer") as MockPC,
+        patch("services.executor_service.LlmAgent"),
+        patch("services.executor_service.ComputerUseToolset"),
+        patch("services.executor_service.InMemorySessionService") as MockSessionSvc,
+        patch("services.executor_service.Runner") as MockRunner,
+        patch("services.executor_service.emit_event") as mock_emit,
+        patch("services.executor_service.build_executor_context", return_value="ctx"),
+        patch("services.executor_service.handle_task_complete", new_callable=AsyncMock),
+        patch("services.executor_service.upload_screenshot", new_callable=AsyncMock, return_value=expected_url),
+    ):
+        mock_pc = AsyncMock()
+        mock_pc.screenshot = AsyncMock(return_value=b"\x89PNG")
+        MockPC.return_value = mock_pc
+
+        mock_svc = AsyncMock()
+        mock_svc.create_session = AsyncMock(return_value=mock_adk_session)
+        MockSessionSvc.return_value = mock_svc
+
+        async def _no_events(**kwargs):
+            return
+            yield
+
+        mock_runner = MagicMock()
+        mock_runner.run_async = MagicMock(side_effect=lambda **kw: _no_events(**kw))
+        MockRunner.return_value = mock_runner
+
+        # Use single step for simplicity
+        plan = {"task_summary": "t", "steps": [_SAMPLE_STEP_PLAN["steps"][0]]}
+
+        from services.executor_service import run_executor
+        await run_executor(_SESSION_ID, plan)
+
+    step_complete_calls = [c for c in mock_emit.call_args_list if c.args[1] == "step_complete"]
+    assert len(step_complete_calls) == 1, f"Expected 1 step_complete, got {len(step_complete_calls)}"
+
+    payload = step_complete_calls[0].args[2]
+    assert payload["step_index"] == 0
+    assert payload["screenshot_url"] == expected_url
+    assert "result_summary" in payload
+    assert "confidence" in payload
+
+
+# ─────────────────────────────── Test 8 ──────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_run_executor_step_complete_with_empty_screenshot_url_uses_none():
+    """
+    When upload_screenshot returns "", step_complete is still emitted with
+    screenshot_url: None (AC: 2 non-fatal path).
+    """
+    mock_adk_session = _make_mock_adk_session()
+
+    with (
+        patch("services.executor_service.PlaywrightComputer") as MockPC,
+        patch("services.executor_service.LlmAgent"),
+        patch("services.executor_service.ComputerUseToolset"),
+        patch("services.executor_service.InMemorySessionService") as MockSessionSvc,
+        patch("services.executor_service.Runner") as MockRunner,
+        patch("services.executor_service.emit_event") as mock_emit,
+        patch("services.executor_service.build_executor_context", return_value="ctx"),
+        patch("services.executor_service.handle_task_complete", new_callable=AsyncMock),
+        patch("services.executor_service.upload_screenshot", new_callable=AsyncMock, return_value=""),
+    ):
+        mock_pc = AsyncMock()
+        mock_pc.screenshot = AsyncMock(return_value=b"\x89PNG")
+        MockPC.return_value = mock_pc
+
+        mock_svc = AsyncMock()
+        mock_svc.create_session = AsyncMock(return_value=mock_adk_session)
+        MockSessionSvc.return_value = mock_svc
+
+        async def _no_events(**kwargs):
+            return
+            yield
+
+        mock_runner = MagicMock()
+        mock_runner.run_async = MagicMock(side_effect=lambda **kw: _no_events(**kw))
+        MockRunner.return_value = mock_runner
+
+        plan = {"task_summary": "t", "steps": [_SAMPLE_STEP_PLAN["steps"][0]]}
+
+        from services.executor_service import run_executor
+        await run_executor(_SESSION_ID, plan)
+
+    step_complete_calls = [c for c in mock_emit.call_args_list if c.args[1] == "step_complete"]
+    assert len(step_complete_calls) == 1
+
+    payload = step_complete_calls[0].args[2]
+    # "" maps to None in the payload (screenshot_url or None)
+    assert payload["screenshot_url"] is None, (
+        f"Expected None when upload returns '', got {payload['screenshot_url']!r}"
+    )

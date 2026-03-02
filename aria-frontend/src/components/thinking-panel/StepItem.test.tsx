@@ -2,7 +2,6 @@ import { render, screen } from "@testing-library/react";
 import { describe, it, expect } from "vitest";
 import { StepItem } from "./StepItem";
 import type { PlanStep } from "@/types/aria";
-
 const mockStep = (overrides: Partial<PlanStep> = {}): PlanStep => ({
   step_index: 0,
   description: "Do something important",
@@ -59,5 +58,41 @@ describe("StepItem", () => {
   it('renders ConfidenceBadge with confidence text', () => {
     render(<StepItem step={mockStep({ confidence: 0.9 })} />);
     expect(screen.getByText("High")).toBeTruthy();
+  });
+
+  it('renders ScreenshotViewer when step is complete and screenshot_url is set', () => {
+    render(
+      <StepItem
+        step={mockStep({
+          status: "complete",
+          screenshot_url: "https://storage.googleapis.com/bucket/steps/0000.png",
+        })}
+      />
+    );
+    const viewer = screen.getByTestId("screenshot-viewer");
+    expect(viewer).toBeTruthy();
+    const img = screen.getByRole("img");
+    expect(img.getAttribute("src")).toBe(
+      "https://storage.googleapis.com/bucket/steps/0000.png"
+    );
+  });
+
+  it('does NOT render ScreenshotViewer when screenshot_url is null', () => {
+    render(
+      <StepItem step={mockStep({ status: "complete", screenshot_url: null })} />
+    );
+    expect(screen.queryByTestId("screenshot-viewer")).toBeNull();
+  });
+
+  it('does NOT render ScreenshotViewer when step is active even with screenshot_url', () => {
+    render(
+      <StepItem
+        step={mockStep({
+          status: "active",
+          screenshot_url: "https://storage.googleapis.com/bucket/steps/0000.png",
+        })}
+      />
+    );
+    expect(screen.queryByTestId("screenshot-viewer")).toBeNull();
   });
 });

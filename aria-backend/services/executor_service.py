@@ -22,6 +22,7 @@ from google.genai import types as genai_types
 
 from agents.executor_agent import build_executor_context
 from prompts.executor_system import EXECUTOR_SYSTEM_PROMPT
+from services.gcs_service import upload_screenshot
 from services.session_service import update_session_status
 from services.sse_service import emit_event
 from services.task_complete_service import handle_task_complete
@@ -91,6 +92,19 @@ async def run_executor(session_id: str, step_plan: dict) -> None:
             current_step_index = step.get("step_index", current_step_index)
             step_description = step.get("description", f"step {current_step_index}")
 
+            # Emit step_start BEFORE retry loop (AC: 1, 5)
+            emit_event(
+                session_id,
+                "step_start",
+                {
+                    "step_index": current_step_index,
+                    "action_type": step.get("action"),
+                    "description": step_description,
+                    "confidence": step.get("confidence", 1.0),
+                },
+                step_index=current_step_index,
+            )
+
             last_exc: Exception | None = None
             for attempt in range(_MAX_STEP_ATTEMPTS):
                 try:
@@ -119,13 +133,6 @@ async def run_executor(session_id: str, step_plan: dict) -> None:
                     ):
                         pass  # ADK toolset fires browser actions internally via ComputerUseToolset
 
-                    completed_steps.append(
-                        {
-                            "step_index": current_step_index,
-                            "description": step_description,
-                            "result": "done",
-                        }
-                    )
                     last_exc = None
                     break  # Step succeeded — move to next step
 
@@ -144,6 +151,35 @@ async def run_executor(session_id: str, step_plan: dict) -> None:
                     )
                     if attempt < _MAX_STEP_ATTEMPTS - 1:
                         await asyncio.sleep(_RETRY_DELAY_SECONDS)
+
+            if last_exc is None:
+                # Step succeeded — capture post-action screenshot, upload, emit step_complete (AC: 2)
+                post_screenshot_bytes = await pc.screenshot()
+                screenshot_url = await upload_screenshot(
+                    session_id, current_step_index, post_screenshot_bytes
+                )
+                emit_event(
+                    session_id,
+                    "step_complete",
+                    {
+                        "step_index": current_step_index,
+                        "screenshot_url": screenshot_url or None,
+                        "result_summary": step_description,
+                        "confidence": step.get("confidence", 1.0),
+                    },
+                    step_index=current_step_index,
+                )
+                completed_steps.append(
+                    {
+                        "step_index": current_step_index,
+                        "description": step_description,
+                        "action_type": step.get("action"),
+                        "confidence": step.get("confidence", 1.0),
+                        "result": "done",
+                        "screenshot_url": screenshot_url or None,
+                    }
+                )
+                continue  # move to next step
 
             if last_exc is not None:
                 # All attempts exhausted — emit step_error and stop execution
@@ -170,6 +206,7 @@ async def run_executor(session_id: str, step_plan: dict) -> None:
 
         # All steps completed successfully
         success = True
+
 
     except BargeInException as e:
         logger.warning(

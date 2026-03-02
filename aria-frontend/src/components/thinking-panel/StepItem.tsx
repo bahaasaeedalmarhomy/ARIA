@@ -1,6 +1,7 @@
 import React from "react";
 import type { PlanStep } from "@/types/aria";
 import { ConfidenceBadge } from "./ConfidenceBadge";
+import { ScreenshotViewer } from "./ScreenshotViewer";
 import { Check, X, Loader2, Circle } from "lucide-react";
 
 type StepItemProps = {
@@ -46,12 +47,20 @@ export function StepItem({ step }: StepItemProps) {
       <div className="shrink-0 mt-0.5 text-xs text-text-secondary font-mono">
         {step.step_index + 1}
       </div>
-      <div className="flex-1 min-w-0 flex items-center gap-2">
-        <span className={descriptionClasses}>{step.description}</span>
-        <span className="shrink-0 flex items-center justify-center w-5 h-5">
-          {statusIcon}
-        </span>
-        <ConfidenceBadge confidence={step.confidence} />
+      <div className="flex-1 min-w-0 flex flex-col">
+        <div className="flex items-center gap-2">
+          <span className={descriptionClasses}>{step.description}</span>
+          <span className="shrink-0 flex items-center justify-center w-5 h-5">
+            {statusIcon}
+          </span>
+          <ConfidenceBadge confidence={step.confidence} />
+        </div>
+        {step.status === "complete" && step.screenshot_url && (
+          <ScreenshotViewer
+            screenshotUrl={step.screenshot_url}
+            alt={`Screenshot for step ${step.step_index + 1}`}
+          />
+        )}
       </div>
     </div>
   );
