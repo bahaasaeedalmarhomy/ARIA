@@ -49,6 +49,7 @@ def _mock_patches(mock_session=_MOCK_SESSION, mock_plan=_MOCK_STEP_PLAN):
         patch("routers.task_router.create_session", new_callable=AsyncMock, return_value=mock_session),
         patch("routers.task_router.update_session_status", new_callable=AsyncMock),
         patch("routers.task_router.run_planner", new_callable=AsyncMock, return_value=mock_plan),
+        patch("routers.task_router.run_executor", new_callable=AsyncMock),
     )
 
 
@@ -111,6 +112,7 @@ def test_start_task_valid_token_returns_200():
         patch("routers.task_router.create_session", new_callable=AsyncMock, return_value=_MOCK_SESSION),
         patch("routers.task_router.update_session_status", new_callable=AsyncMock),
         patch("routers.task_router.run_planner", new_callable=AsyncMock, return_value=_MOCK_STEP_PLAN),
+        patch("routers.task_router.run_executor", new_callable=AsyncMock),
     ):
         response = client.post(
             "/api/task/start",
@@ -146,6 +148,7 @@ def test_start_task_session_id_format():
         patch("routers.task_router.create_session", new_callable=AsyncMock, return_value=mock_session),
         patch("routers.task_router.update_session_status", new_callable=AsyncMock),
         patch("routers.task_router.run_planner", new_callable=AsyncMock, return_value=_MOCK_STEP_PLAN),
+        patch("routers.task_router.run_executor", new_callable=AsyncMock),
     ):
         response = client.post(
             "/api/task/start",
@@ -169,6 +172,7 @@ def test_start_task_response_envelope_shape():
         patch("routers.task_router.create_session", new_callable=AsyncMock, return_value=_MOCK_SESSION),
         patch("routers.task_router.update_session_status", new_callable=AsyncMock),
         patch("routers.task_router.run_planner", new_callable=AsyncMock, return_value=_MOCK_STEP_PLAN),
+        patch("routers.task_router.run_executor", new_callable=AsyncMock),
     ):
         response = client.post(
             "/api/task/start",
@@ -263,6 +267,7 @@ def test_start_task_accepts_optional_context():
         patch("routers.task_router.create_session", new_callable=AsyncMock, return_value=_MOCK_SESSION),
         patch("routers.task_router.update_session_status", new_callable=AsyncMock),
         patch("routers.task_router.run_planner", new_callable=AsyncMock, return_value=_MOCK_STEP_PLAN) as mock_run_planner,
+        patch("routers.task_router.run_executor", new_callable=AsyncMock),
     ):
         response = client.post(
             "/api/task/start",

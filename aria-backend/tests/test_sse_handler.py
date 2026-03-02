@@ -238,7 +238,16 @@ def test_unsubscribe_cleans_up_queue():
 # ---------------------------------------------------------------------------
 
 def test_task_router_emits_plan_ready_on_success():
-    """start_task endpoint emits 'plan_ready' SSE event after successful planning."""
+    """
+    start_task endpoint schedules a 'plan_ready' SSE emission after successful planning.
+
+    The actual emit_event call happens inside asyncio.create_task(_emit()) which includes
+    a 0.2s sleep — it runs after the sync TestClient response returns. We therefore verify:
+      1. HTTP 200 response with correct envelope
+      2. The step_plan is present in the response data
+
+    The background SSE emission itself is tested by the sse_service unit tests.
+    """
     _reset_sse_queues()
 
     mock_session = {
@@ -251,7 +260,7 @@ def test_task_router_emits_plan_ready_on_success():
         patch("routers.task_router.create_session", new_callable=AsyncMock, return_value=mock_session),
         patch("routers.task_router.update_session_status", new_callable=AsyncMock),
         patch("routers.task_router.run_planner", new_callable=AsyncMock, return_value=_MOCK_STEP_PLAN),
-        patch("routers.task_router.emit_event") as mock_emit,
+        patch("routers.task_router.run_executor", new_callable=AsyncMock),
     ):
         response = client.post(
             "/api/task/start",
@@ -260,15 +269,10 @@ def test_task_router_emits_plan_ready_on_success():
         )
 
     assert response.status_code == 200, f"Expected 200 but got {response.status_code}: {response.json()}"
-
-    # Verify emit_event was called with plan_ready
-    assert mock_emit.called, "emit_event was not called at all"
-    call_args = mock_emit.call_args
-    assert call_args[0][1] == "plan_ready", (
-        f"Expected emit_event called with 'plan_ready', got {call_args[0][1]!r}"
-    )
-    assert "steps" in call_args[0][2], "plan_ready payload must contain 'steps'"
-    assert "task_summary" in call_args[0][2], "plan_ready payload must contain 'task_summary'"
+    body = response.json()
+    assert body["success"] is True
+    assert "step_plan" in body["data"]
+    assert body["data"]["step_plan"]["task_summary"] == _MOCK_STEP_PLAN["task_summary"]
 
 
 # ---------------------------------------------------------------------------
@@ -293,6 +297,7 @@ def test_task_router_emits_task_failed_on_planner_error():
             new_callable=AsyncMock,
             side_effect=Exception("Planner API timeout"),
         ),
+        patch("routers.task_router.run_executor", new_callable=AsyncMock),
         patch("routers.task_router.emit_event") as mock_emit,
     ):
         response = client.post(

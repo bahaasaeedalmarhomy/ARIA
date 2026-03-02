@@ -7,6 +7,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
+from services.executor_service import run_executor
 from services.planner_service import run_planner
 from services.session_service import create_session, update_session_status
 from services.sse_service import emit_event
@@ -139,6 +140,36 @@ async def start_task(request: Request, body: StartTaskRequest):
     except Exception:
         logger.warning("Failed to update session %s with step plan — returning plan anyway", session_id)
         warnings.append("Step plan storage in Firestore failed — plan returned but session may be incomplete")
+
+    # 7. Update status to executing and launch executor as background task
+    try:
+        await update_session_status(session_id, "executing")
+    except Exception:
+        logger.warning(
+            "Failed to update session %s status to 'executing' — continuing", session_id
+        )
+        warnings.append(
+            "Session status update to 'executing' failed — Firestore may be stale"
+        )
+
+    try:
+        asyncio.create_task(run_executor(session_id, step_plan))
+    except Exception:
+        logger.exception("Failed to launch executor for session_id=%s", session_id)
+        try:
+            emit_event(session_id, "task_failed", {"reason": "Executor launch failed"})
+        except Exception:
+            logger.warning(
+                "Failed to emit task_failed SSE event for session %s", session_id
+            )
+        return JSONResponse(
+            status_code=500,
+            content={
+                "success": False,
+                "data": None,
+                "error": {"code": "EXECUTOR_LAUNCH_ERROR", "message": "Executor failed to start"},
+            },
+        )
 
     try:
         async def _emit():

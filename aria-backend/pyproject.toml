@@ -16,3 +16,4 @@ filterwarnings = [
     "ignore::UserWarning",
 ]
 addopts = "-v"
+timeout = 60
