@@ -1,3 +1,4 @@
+import asyncio
 import uuid
 from datetime import datetime, timezone
 from google.cloud import firestore
@@ -75,3 +76,32 @@ async def update_session_status(session_id: str, status: str, extra_fields: dict
         update_data.update(extra_fields)
     await doc_ref.update(update_data)
 
+
+# ──────────────────────────── Barge-in cancel flags ───────────────────────────
+
+# Per-session asyncio.Event flags used for barge-in cancellation (Story 3.1+).
+# The PlaywrightComputer checks these before/after every await to raise BargeInException.
+_cancel_flags: dict[str, asyncio.Event] = {}
+
+
+def get_cancel_flag(session_id: str) -> asyncio.Event:
+    """
+    Return (or lazily create) the cancel Event for a session.
+
+    The flag is shared between the SSE barge-in handler (writer)
+    and PlaywrightComputer._check_cancel() (reader).
+    """
+    if session_id not in _cancel_flags:
+        _cancel_flags[session_id] = asyncio.Event()
+    return _cancel_flags[session_id]
+
+
+def reset_cancel_flag(session_id: str) -> None:
+    """
+    Clear the cancel flag for a session.
+    Called at the start of a new execution to ensure a clean state.
+    """
+    if session_id in _cancel_flags:
+        _cancel_flags[session_id].clear()
+    else:
+        _cancel_flags[session_id] = asyncio.Event()
