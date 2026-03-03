@@ -3,10 +3,16 @@
 import { TaskConfirmedBanner } from "@/components/session/TaskConfirmedBanner";
 import { TaskInput } from "@/components/session/TaskInput";
 import { useSSEConsumer } from "@/lib/hooks/useSSEConsumer";
+import { useVoice } from "@/lib/hooks/useVoice";
 import { ThinkingPanel } from "@/components/thinking-panel/ThinkingPanel";
+import { VoiceMic } from "@/components/voice/VoiceMic";
+import { useARIAStore } from "@/lib/store/aria-store";
 
 export default function Home() {
   useSSEConsumer();
+  useVoice();
+
+  const sessionId = useARIAStore((state) => state.sessionId);
 
   return (
     <main className="flex h-screen w-full min-w-0 bg-zinc-950 overflow-hidden">
@@ -17,6 +23,12 @@ export default function Home() {
         </div>
 
         <div className="border-t border-zinc-800 flex flex-col gap-2 pb-2">
+          {/* AC 1: VoiceMic — only when session is active */}
+          {sessionId && (
+            <div className="px-4 py-3">
+              <VoiceMic />
+            </div>
+          )}
           <TaskConfirmedBanner />
           <TaskInput />
         </div>

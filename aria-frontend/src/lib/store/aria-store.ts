@@ -27,6 +27,7 @@ interface VoiceSlice {
     | "paused"
     | "disconnected";
   isVoiceConnecting: boolean;
+  audioAmplitude: number; // 0–1, driven by AnalyserNode.getByteFrequencyData
 }
 
 interface ThinkingPanelSlice {
@@ -53,6 +54,7 @@ export const ARIA_INITIAL_STATE = {
   // Voice slice
   voiceStatus: "idle" as const,
   isVoiceConnecting: false,
+  audioAmplitude: 0,
   // Thinking panel slice
   steps: [],
   panelStatus: "idle" as ThinkingPanelStatus,
