@@ -40,7 +40,7 @@ export function VoiceWaveform() {
       case "listening":
         return "bg-blue-500"; // signal-active #3B82F6
       case "speaking":
-        return "bg-zinc-400";
+        return "bg-emerald-500"; // signal-success #10B981
       case "paused":
         return "bg-violet-400"; // signal-pause #A78BFA
       case "connecting":

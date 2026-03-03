@@ -3,6 +3,7 @@
 import { useARIAStore } from "@/lib/store/aria-store";
 import { isVoiceSupported, useVoice } from "@/lib/hooks/useVoice";
 import { VoiceWaveform } from "./VoiceWaveform";
+import { BargeInPulse } from "./BargeInPulse";
 
 export function VoiceMic() {
   const voiceStatus = useARIAStore((state) => state.voiceStatus);
@@ -30,6 +31,7 @@ export function VoiceMic() {
     <div className="flex flex-col items-start gap-2">
       {/* AC 5: Waveform visualiser */}
       <VoiceWaveform />
+      <BargeInPulse />
 
       {/* AC 1: "Always listening" label */}
       <span className="text-xs text-zinc-400">Always listening</span>

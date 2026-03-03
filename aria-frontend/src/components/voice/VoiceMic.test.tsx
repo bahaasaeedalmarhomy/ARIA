@@ -62,4 +62,25 @@ describe("VoiceMic", () => {
     render(<VoiceMic />);
     expect(screen.getByText("Always listening")).toBeTruthy();
   });
+
+  it("renders BargeInPulse when voiceStatus is paused", () => {
+    useARIAStore.setState({ voiceStatus: "paused" });
+    render(<VoiceMic />);
+    const pulse = screen.getByRole("status");
+    expect(pulse).toBeTruthy();
+  });
+
+  it("does NOT render BargeInPulse when voiceStatus is idle and vadActive is false", () => {
+    useARIAStore.setState({ voiceStatus: "idle", vadActive: false });
+    render(<VoiceMic />);
+    const pulse = document.querySelector('[role="status"]');
+    expect(pulse).toBeNull();
+  });
+
+  it("renders BargeInPulse when vadActive is true (primary VAD path)", () => {
+    useARIAStore.setState({ voiceStatus: "listening", vadActive: true });
+    render(<VoiceMic />);
+    const pulse = screen.getByRole("status");
+    expect(pulse).toBeTruthy();
+  });
 });

@@ -28,6 +28,10 @@ export function isVoiceSupported(): boolean {
  * 44100 or 48000). Gemini Live requires 16 kHz — this function handles the
  * conversion.
  */
+// VAD constants
+const VAD_ONSET_THRESHOLD = 0.15; // normalized amplitude 0–1
+const VAD_SILENCE_DEBOUNCE_MS = 800; // ms of silence before clearing vadActive
+
 export function downsampleAndConvert(
   input: Float32Array,
   fromRate: number,
@@ -57,6 +61,7 @@ export function useVoice() {
   const analyserRef = useRef<AnalyserNode | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const rafIdRef = useRef<number | null>(null);
+  const vadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Refs for playback pipeline
   const playbackContextRef = useRef<AudioContext | null>(null);
@@ -75,7 +80,22 @@ export function useVoice() {
       analyser.getByteFrequencyData(dataArray);
       const mean =
         dataArray.reduce((sum, v) => sum + v, 0) / dataArray.length;
-      useARIAStore.setState({ audioAmplitude: mean / 255 });
+      const amplitude = mean / 255;
+      useARIAStore.setState({ audioAmplitude: amplitude });
+
+      // VAD threshold detection — provides 200ms visual acknowledgment (AC5)
+      const { voiceStatus, vadActive } = useARIAStore.getState();
+      if (voiceStatus === "listening" && amplitude > VAD_ONSET_THRESHOLD) {
+        if (!vadActive) {
+          useARIAStore.setState({ vadActive: true });
+        }
+        if (vadTimerRef.current) clearTimeout(vadTimerRef.current);
+        vadTimerRef.current = setTimeout(() => {
+          useARIAStore.setState({ vadActive: false });
+          vadTimerRef.current = null;
+        }, VAD_SILENCE_DEBOUNCE_MS);
+      }
+
       rafIdRef.current = requestAnimationFrame(tick);
     }
 
@@ -292,10 +312,17 @@ export function useVoice() {
       wsRef.current = null;
     }
 
+    // Clear VAD timer and reset vadActive
+    if (vadTimerRef.current) {
+      clearTimeout(vadTimerRef.current);
+      vadTimerRef.current = null;
+    }
+
     useARIAStore.setState({
       voiceStatus: status,
       isVoiceConnecting: false,
       audioAmplitude: 0,
+      vadActive: false,
     });
   }
 
@@ -313,6 +340,8 @@ export function useVoice() {
     return () => {
       stopAmplitudeLoop();
       if (speakingEndTimerRef.current) clearTimeout(speakingEndTimerRef.current);
+      if (vadTimerRef.current) clearTimeout(vadTimerRef.current);
+      useARIAStore.setState({ vadActive: false });
       streamRef.current?.getTracks().forEach((t) => t.stop());
       processorRef.current?.disconnect();
       analyserRef.current?.disconnect();

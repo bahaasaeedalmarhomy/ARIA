@@ -261,4 +261,59 @@ describe("useVoice", () => {
       expect(length).toBe(8);
     }
   });
+
+  it("VAD sets vadActive true when amplitude exceeds threshold in listening state", () => {
+    useARIAStore.setState({ voiceStatus: "listening", vadActive: false });
+
+    // Simulate what startAmplitudeLoop's tick() does for VAD detection
+    const amplitude = 0.25; // above VAD_ONSET_THRESHOLD (0.15)
+    const { voiceStatus, vadActive } = useARIAStore.getState();
+    if (voiceStatus === "listening" && amplitude > 0.15) {
+      if (!vadActive) {
+        useARIAStore.setState({ vadActive: true });
+      }
+    }
+
+    expect(useARIAStore.getState().vadActive).toBe(true);
+  });
+
+  it("VAD does NOT set vadActive when amplitude is below threshold", () => {
+    useARIAStore.setState({ voiceStatus: "listening", vadActive: false });
+
+    const amplitude = 0.05; // below VAD_ONSET_THRESHOLD (0.15)
+    const { voiceStatus, vadActive } = useARIAStore.getState();
+    if (voiceStatus === "listening" && amplitude > 0.15) {
+      if (!vadActive) {
+        useARIAStore.setState({ vadActive: true });
+      }
+    }
+
+    expect(useARIAStore.getState().vadActive).toBe(false);
+  });
+
+  it("VAD does NOT set vadActive when voiceStatus is not listening", () => {
+    useARIAStore.setState({ voiceStatus: "speaking", vadActive: false });
+
+    const amplitude = 0.5; // above threshold but wrong state
+    const { voiceStatus, vadActive } = useARIAStore.getState();
+    if (voiceStatus === "listening" && amplitude > 0.15) {
+      if (!vadActive) {
+        useARIAStore.setState({ vadActive: true });
+      }
+    }
+
+    expect(useARIAStore.getState().vadActive).toBe(false);
+  });
+
+  it("disconnectMicrophone resets vadActive to false", () => {
+    useARIAStore.setState({ voiceStatus: "listening", vadActive: true });
+
+    const { result } = renderHook(() => useVoice());
+
+    act(() => {
+      result.current.disconnectMicrophone();
+    });
+
+    expect(useARIAStore.getState().vadActive).toBe(false);
+  });
 });

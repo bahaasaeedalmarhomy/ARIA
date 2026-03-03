@@ -44,4 +44,25 @@ describe("VoiceWaveform", () => {
     const waveform = screen.getByRole("img");
     expect(waveform.getAttribute("aria-live")).toBe("polite");
   });
+
+  it("speaking state bars have bg-emerald-500 class", () => {
+    useARIAStore.setState({ voiceStatus: "speaking" });
+    const { container } = render(<VoiceWaveform />);
+    const bars = container.querySelectorAll(".bg-emerald-500");
+    expect(bars.length).toBe(5);
+  });
+
+  it("listening state bars have bg-blue-500 class", () => {
+    useARIAStore.setState({ voiceStatus: "listening", audioAmplitude: 0.5 });
+    const { container } = render(<VoiceWaveform />);
+    const bars = container.querySelectorAll(".bg-blue-500");
+    expect(bars.length).toBe(5);
+  });
+
+  it("paused state bars have bg-violet-400 class", () => {
+    useARIAStore.setState({ voiceStatus: "paused" });
+    const { container } = render(<VoiceWaveform />);
+    const bars = container.querySelectorAll(".bg-violet-400");
+    expect(bars.length).toBe(5);
+  });
 });
