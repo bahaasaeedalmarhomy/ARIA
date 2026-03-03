@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import { startTask } from "@/lib/api/task";
 import { useARIAStore, resetAllSlices } from "@/lib/store/aria-store";
+import { CancelTaskButton } from "./CancelTaskButton";
 
 export function TaskInput() {
   const { idToken, taskStatus, isSessionStarting } = useARIAStore();
@@ -119,6 +120,8 @@ export function TaskInput() {
                     )}
                 </Button>
             </form>
+
+            <CancelTaskButton />
 
             <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
                 <DialogContent>

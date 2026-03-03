@@ -28,7 +28,7 @@ from handlers.audit_writer import write_audit_log
 from prompts.executor_system import EXECUTOR_SYSTEM_PROMPT
 from services.gcs_service import upload_screenshot
 from services.input_queue_service import clear_input_queue, get_input_queue
-from services.session_service import update_session_status
+from services.session_service import update_session_status, is_user_cancel, clear_user_cancel_flag
 from services.sse_service import emit_event
 from services.task_complete_service import handle_task_complete
 from tools.playwright_computer import BargeInException, PlaywrightComputer
@@ -470,21 +470,38 @@ async def run_executor(session_id: str, step_plan: dict) -> None:
 
 
     except BargeInException as e:
-        logger.warning(
-            "Barge-in during executor for session %s at step %d: %s",
-            session_id,
-            current_step_index,
-            e,
-        )
-        emit_event(
-            session_id,
-            "task_paused",
-            {"paused_at_step": current_step_index},
-        )
-        try:
-            await update_session_status(session_id, "paused")
-        except Exception:
-            logger.warning("Failed to update session %s status to 'paused'", session_id)
+        if is_user_cancel(session_id):
+            logger.info(
+                "User-cancelled executor for session %s at step %d",
+                session_id,
+                current_step_index,
+            )
+            emit_event(
+                session_id,
+                "task_failed",
+                {"reason": "user_cancelled", "paused_at_step": current_step_index},
+            )
+            try:
+                await update_session_status(session_id, "cancelled")
+            except Exception:
+                logger.warning("Failed to update session %s status to 'cancelled'", session_id)
+            clear_user_cancel_flag(session_id)
+        else:
+            logger.warning(
+                "Barge-in during executor for session %s at step %d: %s",
+                session_id,
+                current_step_index,
+                e,
+            )
+            emit_event(
+                session_id,
+                "task_paused",
+                {"paused_at_step": current_step_index},
+            )
+            try:
+                await update_session_status(session_id, "paused")
+            except Exception:
+                logger.warning("Failed to update session %s status to 'paused'", session_id)
 
     except Exception as e:
         logger.error(
@@ -505,6 +522,7 @@ async def run_executor(session_id: str, step_plan: dict) -> None:
     finally:
         await pc.stop()  # ALWAYS clean up browser resources
         clear_input_queue(session_id)  # Clean up per-session input queue (AC: 4)
+        clear_user_cancel_flag(session_id)  # Safety net: clear user-cancel flag (idempotent)
 
     if success:
         try:

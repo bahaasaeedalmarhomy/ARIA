@@ -133,4 +133,108 @@ describe("useFirestoreSession", () => {
 
     consoleSpy.mockRestore();
   });
+
+  // ─────────────────── localStorage restoration tests (AC: 6) ──────────────────
+
+  it("restores sessionId from localStorage on mount when store has none", () => {
+    const localStorageMock = {
+      getItem: vi.fn().mockReturnValue("sess_restored"),
+      setItem: vi.fn(),
+      removeItem: vi.fn(),
+    };
+    vi.stubGlobal("localStorage", localStorageMock);
+
+    // Store has no sessionId
+    useARIAStore.setState({ sessionId: null });
+
+    act(() => {
+      renderHook(() => useFirestoreSession());
+    });
+
+    expect(localStorageMock.getItem).toHaveBeenCalledWith("aria_session_id");
+    expect(useARIAStore.getState().sessionId).toBe("sess_restored");
+
+    vi.unstubAllGlobals();
+  });
+
+  it("does not overwrite existing sessionId with localStorage value", () => {
+    const localStorageMock = {
+      getItem: vi.fn().mockReturnValue("sess_stale"),
+      setItem: vi.fn(),
+      removeItem: vi.fn(),
+    };
+    vi.stubGlobal("localStorage", localStorageMock);
+
+    // Store already has a session
+    useARIAStore.setState({ sessionId: "sess_active" });
+
+    act(() => {
+      renderHook(() => useFirestoreSession());
+    });
+
+    // Should NOT have overwritten with stale value
+    expect(useARIAStore.getState().sessionId).toBe("sess_active");
+
+    vi.unstubAllGlobals();
+  });
+
+  it("persists sessionId to localStorage when sessionId is set", () => {
+    const localStorageMock = {
+      getItem: vi.fn().mockReturnValue(null),
+      setItem: vi.fn(),
+      removeItem: vi.fn(),
+    };
+    vi.stubGlobal("localStorage", localStorageMock);
+
+    useARIAStore.setState({ sessionId: "sess_new" });
+
+    act(() => {
+      renderHook(() => useFirestoreSession());
+    });
+
+    expect(localStorageMock.setItem).toHaveBeenCalledWith(
+      "aria_session_id",
+      "sess_new"
+    );
+
+    vi.unstubAllGlobals();
+  });
+
+  it("clears localStorage when panelStatus transitions to 'failed'", () => {
+    const localStorageMock = {
+      getItem: vi.fn().mockReturnValue("sess_active"),
+      setItem: vi.fn(),
+      removeItem: vi.fn(),
+    };
+    vi.stubGlobal("localStorage", localStorageMock);
+
+    useARIAStore.setState({ sessionId: "sess_active", panelStatus: "failed" });
+
+    act(() => {
+      renderHook(() => useFirestoreSession());
+    });
+
+    expect(localStorageMock.removeItem).toHaveBeenCalledWith("aria_session_id");
+
+    vi.unstubAllGlobals();
+  });
+
+  it("clears localStorage when panelStatus transitions to 'complete'", () => {
+    const localStorageMock = {
+      getItem: vi.fn().mockReturnValue("sess_done"),
+      setItem: vi.fn(),
+      removeItem: vi.fn(),
+    };
+    vi.stubGlobal("localStorage", localStorageMock);
+
+    useARIAStore.setState({ sessionId: "sess_done", panelStatus: "complete" });
+
+    act(() => {
+      renderHook(() => useFirestoreSession());
+    });
+
+    expect(localStorageMock.removeItem).toHaveBeenCalledWith("aria_session_id");
+
+    vi.unstubAllGlobals();
+  });
 });

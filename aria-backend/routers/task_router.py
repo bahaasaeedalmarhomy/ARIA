@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 
 from services.executor_service import run_executor
 from services.planner_service import run_planner
-from services.session_service import create_session, update_session_status
+from services.session_service import create_session, update_session_status, get_cancel_flag, set_user_cancel_flag
 from services.sse_service import emit_event
 from services.input_queue_service import has_input_queue, put_user_input
 
@@ -183,6 +183,27 @@ async def start_task(request: Request, body: StartTaskRequest):
             "data": response_data,
             "error": None,
         },
+    )
+
+
+@router.post("/{session_id}/interrupt")
+async def interrupt_task(session_id: str):
+    """
+    POST /api/task/{session_id}/interrupt
+
+    Sets the per-session cancel flag so the Executor's _check_cancel() raises
+    BargeInException on the next playwright action. The executor then emits
+    task_failed with reason "user_cancelled" and updates Firestore status to
+    "cancelled".
+
+    No auth check — session_id is treated as the implicit ownership token (UUID v4).
+    Returns 200 immediately; actual stop is async (within current action boundary).
+    """
+    set_user_cancel_flag(session_id)
+    get_cancel_flag(session_id).set()
+    return JSONResponse(
+        status_code=200,
+        content={"success": True, "data": {"interrupted": True}, "error": None},
     )
 
 

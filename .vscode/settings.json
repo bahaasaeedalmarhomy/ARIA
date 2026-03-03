@@ -1,0 +1,8 @@
+{
+    "chat.tools.terminal.autoApprove": {
+        "/^cd \"d:\\\\Programming Projects\\\\gemini-hackathon\\\\aria-backend\"; python -m pytest tests/test_interrupt_endpoint\\.py -v --tb=short 2>&1 \\| Select-Object -Last 30$/": {
+            "approve": true,
+            "matchCommandLine": true
+        }
+    }
+}

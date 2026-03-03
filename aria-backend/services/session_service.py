@@ -105,3 +105,25 @@ def reset_cancel_flag(session_id: str) -> None:
         _cancel_flags[session_id].clear()
     else:
         _cancel_flags[session_id] = asyncio.Event()
+    clear_user_cancel_flag(session_id)
+
+
+# ──────────────────────────── User-cancel flags ───────────────────────────
+
+# Per-session flags used to distinguish user-initiated cancel from barge-in cancel
+_user_cancel_flags: dict[str, bool] = {}
+
+
+def set_user_cancel_flag(session_id: str) -> None:
+    """Mark a session as user-cancelled (called from /interrupt endpoint)."""
+    _user_cancel_flags[session_id] = True
+
+
+def is_user_cancel(session_id: str) -> bool:
+    """Return True if the cancel was triggered by the user via /interrupt."""
+    return _user_cancel_flags.get(session_id, False)
+
+
+def clear_user_cancel_flag(session_id: str) -> None:
+    """Clear the user-cancel marker (call on session reset)."""
+    _user_cancel_flags.pop(session_id, None)

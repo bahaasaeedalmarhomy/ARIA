@@ -132,10 +132,14 @@ function handleSSEEvent(event: SSEEvent) {
       break;
     }
     case "task_failed": {
-      const payload = event.payload as { error?: string };
+      const payload = event.payload as { error?: string; reason?: string };
+      const isCancelled = payload.reason === "user_cancelled";
       useARIAStore.setState({
         taskStatus: "failed",
-        errorMessage: payload.error ?? "Task failed",
+        panelStatus: "failed",
+        errorMessage: isCancelled
+          ? "Task cancelled by user"
+          : (payload.error ?? payload.reason ?? "Task failed"),
         awaitingInputMessage: null,
       });
       break;

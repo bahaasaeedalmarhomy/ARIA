@@ -4,6 +4,7 @@ import React, { useEffect, useRef } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { StepItem } from "./StepItem";
 import { InputRequestBanner } from "./InputRequestBanner";
+import { AuditLogEntry } from "./AuditLogEntry";
 import { useARIAStore } from "@/lib/store/aria-store";
 import { useFirestoreSession } from "@/lib/hooks/useFirestoreSession";
 
@@ -103,25 +104,14 @@ export function ThinkingPanel() {
               ))}
             </ul>
           )}
-          {panelStatus === "complete" && auditLog.length > 0 && (
+          {auditLog.length > 0 && (
             <div className="mt-4 pt-3 border-t border-border-aria" data-testid="audit-log-section">
               <p className="text-xs text-text-secondary mb-2 font-medium">
                 Audit Log — {auditLog.length} step{auditLog.length !== 1 ? "s" : ""} recorded
               </p>
-              <ul className="flex flex-col gap-1" role="list" aria-label="Audit log">
+              <ul className="flex flex-col" role="list" aria-label="Audit log">
                 {auditLog.map((entry) => (
-                  <li
-                    key={entry.step_index}
-                    className="text-xs font-mono text-text-secondary flex items-start gap-2"
-                  >
-                    <span className="text-text-primary shrink-0">
-                      #{entry.step_index + 1}
-                    </span>
-                    <span className="flex-1">{entry.description}</span>
-                    {entry.screenshot_url && (
-                      <span className="text-blue-400 shrink-0">[screenshot]</span>
-                    )}
-                  </li>
+                  <AuditLogEntry key={entry.step_index} entry={entry} />
                 ))}
               </ul>
             </div>

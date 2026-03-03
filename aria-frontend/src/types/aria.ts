@@ -6,7 +6,8 @@ export type TaskStatus =
   | "awaiting_confirmation"
   | "awaiting_input"
   | "completed"
-  | "failed";
+  | "failed"
+  | "cancelled"; // AC: 4 — user-initiated cancel
 
 export type StepStatus = "pending" | "active" | "complete" | "error";
 

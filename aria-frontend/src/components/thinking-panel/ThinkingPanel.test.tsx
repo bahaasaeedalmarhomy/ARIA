@@ -139,7 +139,7 @@ describe("ThinkingPanel", () => {
     expect(screen.queryByText(/Task understood:/i)).toBeNull();
   });
 
-  it("renders audit log section when panelStatus=complete and auditLog is non-empty", () => {
+  it("renders audit log section when auditLog is non-empty (any panelStatus)", () => {
     setStore({
       steps: [],
       panelStatus: "complete",
@@ -162,10 +162,11 @@ describe("ThinkingPanel", () => {
     expect(section).toBeTruthy();
     expect(screen.getByText(/1 step recorded/i)).toBeTruthy();
     expect(screen.getByText("Navigate to site")).toBeTruthy();
-    expect(screen.getByText("[screenshot]")).toBeTruthy();
+    // Screenshot is rendered as an img thumbnail inside a button, not as text
+    expect(screen.getByRole("button", { name: /view screenshot for step 1/i })).toBeTruthy();
   });
 
-  it("does not render audit log section when panelStatus is not complete", () => {
+  it("renders audit log section during execution when auditLog is non-empty (AC3)", () => {
     setStore({
       steps: [],
       panelStatus: "executing",
@@ -183,7 +184,40 @@ describe("ThinkingPanel", () => {
       ],
     });
     render(<ThinkingPanel />);
-    expect(screen.queryByTestId("audit-log-section")).toBeNull();
+    expect(screen.getByTestId("audit-log-section")).toBeTruthy();
+    expect(screen.getByText("Navigate")).toBeTruthy();
+  });
+
+  it("renders one AuditLogEntry per audit log entry", () => {
+    setStore({
+      steps: [],
+      panelStatus: "complete",
+      auditLog: [
+        {
+          step_index: 0,
+          description: "Step one",
+          action_type: "click",
+          result: "done",
+          screenshot_url: null,
+          confidence: 0.8,
+          timestamp: "2026-03-03T14:22:33.456Z",
+          status: "complete",
+        },
+        {
+          step_index: 1,
+          description: "Step two",
+          action_type: "navigate",
+          result: "done",
+          screenshot_url: null,
+          confidence: 0.9,
+          timestamp: "2026-03-03T14:22:34.000Z",
+          status: "complete",
+        },
+      ],
+    });
+    render(<ThinkingPanel />);
+    expect(screen.getByTestId("audit-entry-0")).toBeTruthy();
+    expect(screen.getByTestId("audit-entry-1")).toBeTruthy();
   });
 
   it("does not render audit log section when auditLog is empty", () => {
@@ -192,7 +226,7 @@ describe("ThinkingPanel", () => {
     expect(screen.queryByTestId("audit-log-section")).toBeNull();
   });
 
-  it("does not render [screenshot] badge when screenshot_url is null", () => {
+  it("does not render [screenshot] text span (replaced by AuditLogEntry img thumbnail)", () => {
     setStore({
       steps: [],
       panelStatus: "complete",
