@@ -79,6 +79,10 @@ describe("useVoice", () => {
         disconnect: vi.fn(),
         onaudioprocess: null as unknown,
       })),
+      createGain: vi.fn(() => ({
+        gain: { value: 1 },
+        connect: vi.fn(),
+      })),
       close: vi.fn().mockResolvedValue(undefined),
       resume: vi.fn().mockResolvedValue(undefined),
       destination: {},

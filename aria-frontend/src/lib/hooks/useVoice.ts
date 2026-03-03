@@ -61,6 +61,7 @@ export function useVoice() {
   // Refs for playback pipeline
   const playbackContextRef = useRef<AudioContext | null>(null);
   const nextPlayTimeRef = useRef<number>(0);
+  const speakingEndTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // WebSocket ref
   const wsRef = useRef<WebSocket | null>(null);
@@ -118,7 +119,11 @@ export function useVoice() {
     source.start(startTime);
     nextPlayTimeRef.current = startTime + buffer.duration;
 
-    // First chunk → mark speaking; last chunk → reset to listening
+    // First chunk → mark speaking; clear any pending "back to listening" timer
+    if (speakingEndTimerRef.current) {
+      clearTimeout(speakingEndTimerRef.current);
+      speakingEndTimerRef.current = null;
+    }
     useARIAStore.setState({ voiceStatus: "speaking" });
     source.onended = () => {
       // Only reset if no more chunks are queued (nextPlayTime already passed)
@@ -126,7 +131,13 @@ export function useVoice() {
         playbackContextRef.current &&
         nextPlayTimeRef.current <= playbackContextRef.current.currentTime + 0.05
       ) {
-        useARIAStore.setState({ voiceStatus: "listening" });
+        // Debounce to prevent flickering with bursty chunk delivery
+        speakingEndTimerRef.current = setTimeout(() => {
+          if (useARIAStore.getState().voiceStatus === "speaking") {
+            useARIAStore.setState({ voiceStatus: "listening" });
+          }
+          speakingEndTimerRef.current = null;
+        }, 300);
       }
     };
   }
@@ -136,6 +147,16 @@ export function useVoice() {
   async function connectMicrophone() {
     if (!isVoiceSupported()) return;
     if (!sessionId) return;
+
+    // Guard against double-connect (rapid clicks before state propagates)
+    const currentState = useARIAStore.getState();
+    if (
+      currentState.isVoiceConnecting ||
+      currentState.voiceStatus === "listening" ||
+      currentState.voiceStatus === "speaking"
+    ) {
+      return;
+    }
 
     useARIAStore.setState({ isVoiceConnecting: true, voiceStatus: "connecting" });
 
@@ -182,7 +203,11 @@ export function useVoice() {
 
       // Must connect to destination or Chrome silences the processor
       source.connect(processor);
-      processor.connect(audioContext.destination);
+      // Route through zero-gain node to suppress mic echo through speakers
+      const silentGain = audioContext.createGain();
+      silentGain.gain.value = 0;
+      processor.connect(silentGain);
+      silentGain.connect(audioContext.destination);
 
       // ── Playback AudioContext ────────────────────────────────
       const playbackContext = new AudioContext({ sampleRate: 24000 });
@@ -208,11 +233,11 @@ export function useVoice() {
       };
 
       ws.onerror = () => {
-        disconnect();
+        disconnect("disconnected");
       };
 
       ws.onclose = () => {
-        disconnect();
+        disconnect("disconnected");
       };
     } catch {
       // getUserMedia permission denied or other error
@@ -225,9 +250,17 @@ export function useVoice() {
 
   // ── Disconnect ─────────────────────────────────────────────────
 
-  function disconnect() {
+  function disconnect(
+    status: "idle" | "disconnected" = "idle"
+  ) {
     // Stop amplitude loop
     stopAmplitudeLoop();
+
+    // Clear speaking-end debounce timer
+    if (speakingEndTimerRef.current) {
+      clearTimeout(speakingEndTimerRef.current);
+      speakingEndTimerRef.current = null;
+    }
 
     // Stop media tracks
     streamRef.current?.getTracks().forEach((t) => t.stop());
@@ -245,6 +278,12 @@ export function useVoice() {
       audioContextRef.current = null;
     }
 
+    // Close playback AudioContext (prevent leak on reconnect)
+    if (playbackContextRef.current) {
+      playbackContextRef.current.close().catch(() => undefined);
+      playbackContextRef.current = null;
+    }
+
     // Close WebSocket cleanly
     if (wsRef.current) {
       if (wsRef.current.readyState === WebSocket.OPEN) {
@@ -254,7 +293,7 @@ export function useVoice() {
     }
 
     useARIAStore.setState({
-      voiceStatus: "idle",
+      voiceStatus: status,
       isVoiceConnecting: false,
       audioAmplitude: 0,
     });
@@ -273,6 +312,7 @@ export function useVoice() {
 
     return () => {
       stopAmplitudeLoop();
+      if (speakingEndTimerRef.current) clearTimeout(speakingEndTimerRef.current);
       streamRef.current?.getTracks().forEach((t) => t.stop());
       processorRef.current?.disconnect();
       analyserRef.current?.disconnect();

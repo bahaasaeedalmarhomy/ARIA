@@ -13,8 +13,9 @@ const BACKEND_URL =
  * Converts an HTTP(S) backend URL to a WS(S) URL and appends the audio
  * WebSocket path for the given session.
  */
-export function buildWsUrl(sessionId: string): string {
-  const wsBase = BACKEND_URL.replace(/^https:\/\//, "wss://").replace(
+export function buildWsUrl(sessionId: string, baseUrl?: string): string {
+  const origin = baseUrl ?? BACKEND_URL;
+  const wsBase = origin.replace(/^https:\/\//, "wss://").replace(
     /^http:\/\//,
     "ws://"
   );

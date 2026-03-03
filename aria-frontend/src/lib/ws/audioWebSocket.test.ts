@@ -8,14 +8,8 @@ describe("buildWsUrl", () => {
     );
   });
 
-  it("converts https:// to wss://", () => {
-    // Override NEXT_PUBLIC_BACKEND_URL by patching the module — done via env
-    // For this test we exercise the pure helper logic via replaceAll manually
-    const input = "https://api.example.com";
-    const wsBase = input
-      .replace(/^https:\/\//, "wss://")
-      .replace(/^http:\/\//, "ws://");
-    expect(`${wsBase}/ws/audio/test-session`).toBe(
+  it("converts https:// to wss:// when baseUrl is provided", () => {
+    expect(buildWsUrl("test-session", "https://api.example.com")).toBe(
       "wss://api.example.com/ws/audio/test-session"
     );
   });

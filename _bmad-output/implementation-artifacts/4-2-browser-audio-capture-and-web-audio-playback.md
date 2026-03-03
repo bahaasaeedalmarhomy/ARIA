@@ -1,6 +1,6 @@
 # Story 4.2: Browser Audio Capture and Web Audio Playback
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -286,3 +286,4 @@ Claude Sonnet 4.6 (GitHub Copilot)
 | Date | Change |
 |------|--------|
 | 2026-03-03 | Implemented story 4.2: audioWebSocket.ts, useVoice.ts, VoiceWaveform.tsx, VoiceMic.tsx, store audioAmplitude field, page.tsx wiring. 22 new tests added; 151 total passing. |
+| 2026-03-03 | Code review: fixed 6 issues (H1: mic echo via zero-gain node, H2: playback AudioContext leak on reconnect, M1: idle→disconnected on error paths, M2: fake HTTPS→WSS test now calls buildWsUrl, M3: double-connect guard, M4: speaking→listening debounce). 151 tests still passing. |
