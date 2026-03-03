@@ -90,3 +90,86 @@ async def test_create_session_document_path_is_correct():
     mock_db.collection.assert_called_once_with("sessions")
     # Verify document ID matches session_id
     mock_collection.document.assert_called_once_with(result["session_id"])
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Cancel flag management (Story 3.1, 3.6)
+# ──────────────────────────────────────────────────────────────────────────────
+
+def test_get_cancel_flag_returns_event():
+    """get_cancel_flag returns an asyncio.Event instance."""
+    import asyncio
+    from services.session_service import get_cancel_flag
+    flag = get_cancel_flag("test-flag-event")
+    assert isinstance(flag, asyncio.Event)
+
+
+def test_get_cancel_flag_returns_same_instance():
+    """Consecutive calls to get_cancel_flag return the same Event for a session."""
+    from services.session_service import get_cancel_flag
+    f1 = get_cancel_flag("test-flag-same")
+    f2 = get_cancel_flag("test-flag-same")
+    assert f1 is f2
+
+
+def test_reset_cancel_flag_clears_event():
+    """reset_cancel_flag clears the event so is_set() returns False."""
+    from services.session_service import get_cancel_flag, reset_cancel_flag
+    flag = get_cancel_flag("test-reset")
+    flag.set()
+    assert flag.is_set()
+    reset_cancel_flag("test-reset")
+    assert not get_cancel_flag("test-reset").is_set()
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# User-cancel flag management (Story 3.6)
+# ──────────────────────────────────────────────────────────────────────────────
+
+def test_set_user_cancel_flag_marks_session():
+    """set_user_cancel_flag makes is_user_cancel return True."""
+    from services.session_service import (
+        set_user_cancel_flag, is_user_cancel, clear_user_cancel_flag
+    )
+    sid = "test-user-cancel-set"
+    clear_user_cancel_flag(sid)
+    assert not is_user_cancel(sid)
+    set_user_cancel_flag(sid)
+    assert is_user_cancel(sid)
+    clear_user_cancel_flag(sid)
+
+
+def test_is_user_cancel_false_by_default():
+    """is_user_cancel returns False for a session that was never flagged."""
+    from services.session_service import is_user_cancel
+    assert not is_user_cancel("test-never-cancelled")
+
+
+def test_clear_user_cancel_flag_resets():
+    """clear_user_cancel_flag makes is_user_cancel return False."""
+    from services.session_service import (
+        set_user_cancel_flag, is_user_cancel, clear_user_cancel_flag
+    )
+    sid = "test-user-cancel-clear"
+    set_user_cancel_flag(sid)
+    assert is_user_cancel(sid)
+    clear_user_cancel_flag(sid)
+    assert not is_user_cancel(sid)
+
+
+def test_clear_user_cancel_flag_no_op_when_absent():
+    """clear_user_cancel_flag is safe to call when session was never flagged."""
+    from services.session_service import clear_user_cancel_flag
+    clear_user_cancel_flag("test-clear-absent")  # Must not raise
+
+
+def test_reset_cancel_flag_also_clears_user_cancel():
+    """reset_cancel_flag also clears the user-cancel flag."""
+    from services.session_service import (
+        set_user_cancel_flag, is_user_cancel, reset_cancel_flag
+    )
+    sid = "test-reset-clears-user"
+    set_user_cancel_flag(sid)
+    assert is_user_cancel(sid)
+    reset_cancel_flag(sid)
+    assert not is_user_cancel(sid)

@@ -204,6 +204,31 @@ async def test_navigate_propagates_barge_in_before_goto():
     mock_page.goto.assert_not_called()
 
 
+# ────────────────────── build_executor_context: user_provided_value ───────────
+
+def test_build_executor_context_with_user_provided_value():
+    """When user_provided_value is set, context includes the value wrapped in tags."""
+    step_plan = {"task_summary": "Test", "steps": []}
+    result = build_executor_context(step_plan, [], "", user_provided_value="test@example.com")
+    assert "<user_provided_value>" in result
+    assert "test@example.com" in result
+    assert "</user_provided_value>" in result
+
+
+def test_build_executor_context_without_user_provided_value():
+    """When user_provided_value is None, context does NOT include user_provided_value tags."""
+    step_plan = {"task_summary": "Test", "steps": []}
+    result = build_executor_context(step_plan, [], "")
+    assert "<user_provided_value>" not in result
+
+
+def test_build_executor_context_empty_screenshot():
+    """When screenshot_b64 is empty string, data URI is still present but with empty data."""
+    step_plan = {"task_summary": "Test", "steps": []}
+    result = build_executor_context(step_plan, [], "")
+    assert "data:image/png;base64," in result
+
+
 # ─────────────────────────── Tests 9-12: handle_task_complete (AC: 4) ────────
 
 @pytest.mark.asyncio

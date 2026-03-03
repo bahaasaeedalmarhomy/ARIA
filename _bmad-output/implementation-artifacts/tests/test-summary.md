@@ -79,8 +79,149 @@
 4. **aria-frontend/src/components/providers/firebase-auth-provider.test.tsx** — 6 tests covering render null, auth subscription/unsubscription, uid/idToken propagation, signInAnonymously trigger
 5. **aria-frontend/src/components/session/TaskConfirmedBanner.test.tsx** — 5 tests covering conditional rendering, content display, styling assertions
 
-## Next Steps
+## Next Steps (Epics 1–2)
 
 - Run tests in CI (GitHub Actions deploy pipeline)
-- Epic 3 (Executor + Browser Automation) will need Playwright E2E tests
 - Epic 4 (Voice + Barge-in) will need WebSocket and audio tests
+
+---
+
+# Epic 3: Executor Agent & Browser Automation
+
+**Date**: 2026-03-03
+**Scope**: All 6 stories of Epic 3 (Stories 3.1 – 3.6)
+**Frameworks**: pytest + pytest-anyio (backend), Vitest + React Testing Library (frontend)
+
+## Generated Tests
+
+### Backend — API / Service Tests
+
+| Status | File | Tests | Stories | Description |
+|--------|------|-------|---------|-------------|
+| ✅ existing + **new** | tests/test_executor_agent.py | 19 (+3) | 3.1, 3.5 | LlmAgent config, root_agent wiring, build_executor_context (incl. user_provided_value), _check_cancel, handle_task_complete |
+| ✅ existing + **new** | tests/test_playwright_computer.py | 37 (+20) | 3.2, 3.4 | All PlaywrightComputer methods: navigate, click (bbox/selector/retry), type_text, scroll (all 4 dirs), click_at, hover_at, scroll_at, go_back/forward, key_combination, drag_and_drop, wait, search, open_web_browser, current_state, screen_size, environment, screenshot, detect_captcha |
+| ✅ existing | tests/test_executor_service.py | 15 | 3.2-3.5 | run_executor: success, barge-in, retry, exhausted retries, cleanup, step_start/step_complete SSE, page timeout, Gemini API retry, CAPTCHA detection, audit log write, requires_user_input |
+| ✅ existing | tests/test_gcs_service.py | 5 | 3.3 | upload_screenshot: no bucket, empty bytes, correct blob path, public URL, non-fatal exception |
+| ✅ existing | tests/test_audit_writer.py | 4 | 3.5 | write_audit_log: required fields, ISO 8601 timestamp, status always "complete", update_session_status delegation |
+| ✅ existing | tests/test_input_queue_service.py | 10 | 3.4 | get/put/clear/has input queue, session isolation |
+| ✅ existing | tests/test_interrupt_endpoint.py | 5 | 3.6 | POST /interrupt: 200 response, cancel flag set, user_cancel flag set, executor user-cancel vs barge-in behavior |
+| ✅ existing + **new** | tests/test_session_service.py | 11 (+8) | 1.4, 3.1, 3.6 | create_session, cancel flag CRUD, user-cancel flag CRUD, reset_cancel_flag clears user-cancel |
+| ✅ **new** | tests/test_user_input_endpoint.py | 5 | 3.4 | POST /{session_id}/input: 200 with queue, 404 without queue, empty value rejection, queue delivery, missing body 422 |
+
+**Backend total: 164 tests — all passing**
+
+### Frontend — Component & Hook Tests
+
+| Status | File | Tests | Stories | Description |
+|--------|------|-------|---------|-------------|
+| ✅ existing | ScreenshotViewer.test.tsx | 4 | 3.3 | img src/alt, data-testid, custom alt |
+| ✅ **new** | ScreenshotModal.test.tsx | 8 | 3.6 | Screenshot URL, 1-based step title, alt text, onClose callback, open state, font-mono title, lazy loading |
+| ✅ existing | StepItem.test.tsx | 9 | 3.3 | Status icons (pending/active/complete/error), description, confidence badge, ScreenshotViewer conditional render |
+| ✅ existing | InputRequestBanner.test.tsx | 10 | 3.4 | Message render, data-testid, textarea, Send button, validation, POST call, loading state, onSubmitted, error display |
+| ✅ existing | AuditLogEntry.test.tsx | 7 | 3.6 | Step number, action badge, description, screenshot thumbnail, modal toggle, fallback label, data-testid |
+| ✅ existing | ThinkingPanel.test.tsx | 13 | 3.3, 3.5, 3.6 | Idle/planning states, step render, done/failed headers, scroll-to-active, animation, task summary, audit log section, real-time updates |
+| ✅ existing | useFirestoreSession.test.ts | 11 | 3.5, 3.6 | Subscription lifecycle, auditLog population, snapshot handling, cleanup, localStorage restore/persist |
+| ✅ existing | useSSEConsumer.test.ts | 12 | 3.4 | EventSource lifecycle, plan_ready, step_start, step_complete, task_failed, awaiting_input, reconnection, cleanup |
+| ✅ existing | CancelTaskButton.test.tsx | 10 | 3.6 | Visibility by taskStatus, interrupt POST, loading/error states, null sessionId guard |
+
+**Frontend total: 129 tests — all passing**
+
+## Coverage — Epic 3
+
+### Story 3.1: Executor Agent (ADK SequentialAgent Wiring)
+
+| Feature | Backend | Frontend | Status |
+|---------|---------|----------|--------|
+| LlmAgent creation & config | ✅ 5 tests | — | Covered |
+| root_agent (SequentialAgent) | ✅ 2 tests | — | Covered |
+| build_executor_context | ✅ 6 tests | — | Covered |
+| user_provided_value in context | ✅ 3 tests | — | **New** |
+| _check_cancel + handle_task_complete | ✅ 6 tests | — | Covered |
+
+### Story 3.2: Playwright Browser Actions
+
+| Feature | Backend | Frontend | Status |
+|---------|---------|----------|--------|
+| PlaywrightComputer.navigate | ✅ 2 tests | — | Covered |
+| click (bbox / selector / retry) | ✅ 3 tests | — | Covered |
+| type_text + type_text_at | ✅ 4 tests | — | Covered |
+| scroll (up/down/left/right) + scroll_at | ✅ 6 tests | — | **New** |
+| hover_at, go_back, go_forward | ✅ 3 tests | — | **New** |
+| key_combination, drag_and_drop, wait | ✅ 3 tests | — | **New** |
+| search, open_web_browser | ✅ 2 tests | — | **New** |
+| current_state, screen_size, environment | ✅ 3 tests | — | **New** |
+| screenshot, detect_captcha | ✅ 4 tests | — | Covered |
+
+### Story 3.3: Screenshot Capture, GCS Upload, SSE Events
+
+| Feature | Backend | Frontend | Status |
+|---------|---------|----------|--------|
+| upload_screenshot | ✅ 5 tests | — | Covered |
+| step_start / step_complete SSE | ✅ 2 tests | — | Covered |
+| ScreenshotViewer | — | ✅ 4 tests | Covered |
+| StepItem (screenshot conditional) | — | ✅ 9 tests | Covered |
+
+### Story 3.4: Error Handling, Timeouts, CAPTCHA Pause
+
+| Feature | Backend | Frontend | Status |
+|---------|---------|----------|--------|
+| Page load timeout handling | ✅ 2 tests | — | Covered |
+| CAPTCHA detection | ✅ 2 tests | — | Covered |
+| Gemini API retry + backoff | ✅ 2 tests | — | Covered |
+| requires_user_input flow | ✅ 2 tests | — | Covered |
+| /input endpoint | ✅ 5 tests | — | **New** |
+| Input queue service | ✅ 10 tests | — | Covered |
+| InputRequestBanner | — | ✅ 10 tests | Covered |
+| useSSEConsumer (awaiting_input) | — | ✅ 12 tests | Covered |
+
+### Story 3.5: Firestore Audit Log Writer & Mid-Task Input
+
+| Feature | Backend | Frontend | Status |
+|---------|---------|----------|--------|
+| write_audit_log | ✅ 4 tests | — | Covered |
+| update_session_status | ✅ 2 tests | — | Covered |
+| Audit log Firestore subscription | — | ✅ 11 tests | Covered |
+| ThinkingPanel audit section | — | ✅ 13 tests | Covered |
+
+### Story 3.6: Cancel / Barge-in & UI Polish
+
+| Feature | Backend | Frontend | Status |
+|---------|---------|----------|--------|
+| BargeInException | ✅ 3 tests | — | Covered |
+| Cancel flags (cancel + user_cancel) | ✅ 11 tests | — | **New** (+8) |
+| /interrupt endpoint | ✅ 5 tests | — | Covered |
+| CancelTaskButton | — | ✅ 10 tests | Covered |
+| ScreenshotModal | — | ✅ 8 tests | **New** |
+| AuditLogEntry | — | ✅ 7 tests | Covered |
+
+### Summary
+
+- **PlaywrightComputer methods**: 20/20 covered (100% — all BaseComputer interface methods)
+- **Executor service flows**: 15 scenarios (success, barge-in, retry, timeout, Gemini retry, CAPTCHA, audit log, user input)
+- **API endpoints**: `/start`, `/interrupt`, `/{session_id}/input` all tested at HTTP level
+- **Services**: session_service, gcs_service, input_queue_service, sse_service, executor_service all covered
+- **Handlers**: audit_writer, task_complete_service all covered
+- **UI components**: 8/8 covered (ScreenshotViewer, ScreenshotModal, StepItem, InputRequestBanner, AuditLogEntry, ThinkingPanel, CancelTaskButton, ConfidenceBadge)
+- **Hooks**: 2/2 covered (useSSEConsumer, useFirestoreSession)
+
+## New Tests Added for Epic 3
+
+1. **aria-backend/tests/test_playwright_computer.py** — +20 tests covering all BaseComputer interface methods (click_at, hover_at, scroll_at, go_back/forward, key_combination, drag_and_drop, wait, search, open_web_browser, current_state, screen_size, environment, type_text_at variants)
+2. **aria-backend/tests/test_session_service.py** — +8 tests covering cancel flag CRUD and user-cancel flag lifecycle
+3. **aria-backend/tests/test_executor_agent.py** — +3 tests covering build_executor_context with user_provided_value and empty screenshot
+4. **aria-backend/tests/test_user_input_endpoint.py** — 5 new tests for POST /{session_id}/input endpoint
+5. **aria-frontend/src/components/thinking-panel/ScreenshotModal.test.tsx** — 8 new tests for modal rendering, interaction, and accessibility
+
+## Test Results
+
+```
+Backend:  164 passed, 7 warnings in ~32s
+Frontend: 129 passed (15 test files) in ~15s
+Total:    293 tests — ALL PASSING ✅
+```
+
+## Next Steps
+
+- Run full test suite in CI (GitHub Actions deploy pipeline)
+- Epic 4 (Voice + Barge-in) will need WebSocket and audio tests
+- Consider adding pytest-cov threshold enforcement to CI

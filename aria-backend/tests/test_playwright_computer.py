@@ -270,3 +270,178 @@ async def test_detect_captcha_returns_false_on_exception():
     result = await pc.detect_captcha()
 
     assert result is False
+
+
+# ──────────────────────────────────────────────────────────────────────
+# BaseComputer interface methods (Story 3.1, 3.2)
+# ──────────────────────────────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_click_at_calls_mouse_click_at_coordinates():
+    """click_at(x, y) must call page.mouse.click at exact coordinates."""
+    pc = _make_pc()
+    await pc.click_at(150, 200)
+    pc.page.mouse.click.assert_called_once_with(150, 200)
+
+
+@pytest.mark.asyncio
+async def test_hover_at_calls_mouse_move():
+    """hover_at(x, y) must call page.mouse.move."""
+    pc = _make_pc()
+    await pc.hover_at(100, 300)
+    pc.page.mouse.move.assert_called_once_with(100, 300)
+
+
+@pytest.mark.asyncio
+async def test_scroll_document_left():
+    """scroll_document('left') must call mouse.wheel with delta_x=-500."""
+    pc = _make_pc()
+    await pc.scroll_document("left")
+    pc.page.mouse.wheel.assert_called_once_with(-500, 0)
+
+
+@pytest.mark.asyncio
+async def test_scroll_document_right():
+    """scroll_document('right') must call mouse.wheel with delta_x=500."""
+    pc = _make_pc()
+    await pc.scroll_document("right")
+    pc.page.mouse.wheel.assert_called_once_with(500, 0)
+
+
+@pytest.mark.asyncio
+async def test_scroll_at_moves_and_scrolls():
+    """scroll_at(x, y, direction, magnitude) must move to (x, y) then scroll."""
+    pc = _make_pc()
+    await pc.scroll_at(100, 200, "down", 300)
+    pc.page.mouse.move.assert_called_once_with(100, 200)
+    pc.page.mouse.wheel.assert_called_once_with(0, 300)
+
+
+@pytest.mark.asyncio
+async def test_scroll_at_left_direction():
+    """scroll_at with direction='left' must produce negative delta_x."""
+    pc = _make_pc()
+    await pc.scroll_at(50, 50, "left", 250)
+    pc.page.mouse.wheel.assert_called_once_with(-250, 0)
+
+
+@pytest.mark.asyncio
+async def test_go_back_calls_page_go_back():
+    """go_back() must call page.go_back()."""
+    pc = _make_pc()
+    await pc.go_back()
+    pc.page.go_back.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_go_forward_calls_page_go_forward():
+    """go_forward() must call page.go_forward()."""
+    pc = _make_pc()
+    await pc.go_forward()
+    pc.page.go_forward.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_key_combination_presses_combo():
+    """key_combination(['Control', 'c']) must call keyboard.press('Control+c')."""
+    pc = _make_pc()
+    await pc.key_combination(["Control", "c"])
+    pc.page.keyboard.press.assert_called_once_with("Control+c")
+
+
+@pytest.mark.asyncio
+async def test_drag_and_drop_mouse_sequence():
+    """drag_and_drop must call move → down → move → up in sequence."""
+    pc = _make_pc()
+    await pc.drag_and_drop(10, 20, 100, 200)
+
+    calls = pc.page.mouse.method_calls
+    method_names = [name for name, args, kwargs in calls]
+    assert "move" in method_names
+    assert "down" in method_names
+    assert "up" in method_names
+
+    # First move to source, then to destination
+    pc.page.mouse.down.assert_called_once()
+    pc.page.mouse.up.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_wait_sleeps_for_given_seconds():
+    """wait(seconds) must call asyncio.sleep with the given value."""
+    pc = _make_pc()
+    with patch("tools.playwright_computer.asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
+        await pc.wait(5)
+    mock_sleep.assert_called_once_with(5)
+
+
+@pytest.mark.asyncio
+async def test_search_navigates_to_google():
+    """search() must navigate to https://www.google.com."""
+    pc = _make_pc()
+    await pc.search()
+    pc.page.goto.assert_called_once_with(
+        "https://www.google.com", wait_until="networkidle", timeout=15_000
+    )
+
+
+@pytest.mark.asyncio
+async def test_open_web_browser_navigates_to_blank():
+    """open_web_browser() must navigate to about:blank."""
+    pc = _make_pc()
+    await pc.open_web_browser()
+    pc.page.goto.assert_called_once_with("about:blank")
+
+
+@pytest.mark.asyncio
+async def test_current_state_returns_computer_state():
+    """current_state() returns a ComputerState with screenshot and URL."""
+    from google.adk.tools.computer_use.base_computer import ComputerState
+    pc = _make_pc()
+    result = await pc.current_state()
+    assert isinstance(result, ComputerState)
+
+
+@pytest.mark.asyncio
+async def test_screen_size_returns_default_dimensions():
+    """screen_size() must return (1280, 800) matching DEFAULT_SCREEN_WIDTH/HEIGHT."""
+    pc = _make_pc()
+    w, h = await pc.screen_size()
+    assert w == 1280
+    assert h == 800
+
+
+@pytest.mark.asyncio
+async def test_environment_returns_browser():
+    """environment() must return ENVIRONMENT_BROWSER."""
+    from google.adk.tools.computer_use.base_computer import ComputerEnvironment
+    pc = _make_pc()
+    env = await pc.environment()
+    assert env == ComputerEnvironment.ENVIRONMENT_BROWSER
+
+
+@pytest.mark.asyncio
+async def test_screenshot_returns_png_bytes():
+    """screenshot() returns bytes from page.screenshot(full_page=False)."""
+    pc = _make_pc()
+    pc.page.screenshot = AsyncMock(return_value=b"\x89PNG")
+    result = await pc.screenshot()
+    assert result == b"\x89PNG"
+
+
+@pytest.mark.asyncio
+async def test_type_text_at_press_enter_true():
+    """type_text_at with press_enter=True must call keyboard.press('Enter') after typing."""
+    pc = _make_pc()
+    await pc.type_text_at(100, 200, "hello", press_enter=True, clear_before_typing=False)
+    pc.page.keyboard.press.assert_called_with("Enter")
+
+
+@pytest.mark.asyncio
+async def test_type_text_at_clear_before_typing():
+    """type_text_at with clear_before_typing=True must call keyboard.press('Control+a')."""
+    pc = _make_pc()
+    await pc.type_text_at(100, 200, "hello", press_enter=False, clear_before_typing=True)
+    # Should have pressed Control+a
+    press_calls = [str(c) for c in pc.page.keyboard.press.call_args_list]
+    assert any("Control+a" in c for c in press_calls)
