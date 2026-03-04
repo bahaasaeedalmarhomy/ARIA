@@ -78,7 +78,7 @@ development_status:
   # forms — while the thinking panel updates and the audit log fills.
   # FRs: FR5, FR8–FR16, FR18, FR20, FR21 (text), FR33–FR37, FR41, FR42
   # ─────────────────────────────────────────────────────────────────
-  epic-3: in-progress
+  epic-3: done
   3-1-executor-agent-with-adk-sequentialagent-wiring: done
   3-2-playwright-browser-actions: done
   3-3-screenshot-capture-gcs-upload-and-step-sse-events: done
@@ -99,5 +99,5 @@ development_status:
   4-2-browser-audio-capture-and-web-audio-playback: done
   4-3-voicewaveform-bargeinpulse-components-and-vad-visual-states: done
   4-4-voice-barge-in-execution-halt-and-plan-adaptation: done
-  4-5-destructive-action-guard-voice-and-visual-confirmation: ready-for-dev
+  4-5-destructive-action-guard-voice-and-visual-confirmation: done
   epic-4-retrospective: optional

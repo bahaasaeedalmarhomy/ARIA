@@ -390,4 +390,119 @@ describe("useSSEConsumer", () => {
     expect(state.steps).toHaveLength(1);
     expect(state.steps[0].status).toBe("pending");
   });
+
+  // ---------------------------------------------------------------------------
+  // Story 4.5: awaiting_confirmation event handling
+  // ---------------------------------------------------------------------------
+
+  it("awaiting_confirmation event sets taskStatus, panelStatus, and confirmationRequest", () => {
+    useARIAStore.setState({ sessionId: "test-session" });
+    renderHook(() => useSSEConsumer());
+
+    act(() => {
+      MockEventSource.instance?.onmessage?.({
+        data: JSON.stringify({
+          event_type: "awaiting_confirmation",
+          session_id: "test-session",
+          step_index: 2,
+          timestamp: "2024-01-01T00:00:00Z",
+          payload: {
+            step_index: 2,
+            action_description: "submit the purchase form",
+            warning: "This action cannot be undone",
+          },
+        }),
+      } as MessageEvent);
+    });
+
+    const state = useARIAStore.getState();
+    expect(state.taskStatus).toBe("awaiting_confirmation");
+    expect(state.panelStatus).toBe("awaiting_confirmation");
+    expect(state.confirmationRequest).toEqual({
+      step_index: 2,
+      action_description: "submit the purchase form",
+      warning: "This action cannot be undone",
+    });
+  });
+
+  it("task_paused event clears confirmationRequest", () => {
+    useARIAStore.setState({
+      sessionId: "test-session",
+      confirmationRequest: {
+        step_index: 1,
+        action_description: "delete the record",
+        warning: "This action cannot be undone",
+      },
+      steps: [mockStep({ step_index: 0, status: "active" })],
+    });
+    renderHook(() => useSSEConsumer());
+
+    act(() => {
+      MockEventSource.instance?.onmessage?.({
+        data: JSON.stringify({
+          event_type: "task_paused",
+          session_id: "test-session",
+          step_index: null,
+          timestamp: "2024-01-01T00:00:00Z",
+          payload: { paused_at_step: 0, reason: "barge_in" },
+        }),
+      } as MessageEvent);
+    });
+
+    expect(useARIAStore.getState().confirmationRequest).toBeNull();
+  });
+
+  it("task_complete event clears confirmationRequest", () => {
+    useARIAStore.setState({
+      sessionId: "test-session",
+      confirmationRequest: {
+        step_index: 0,
+        action_description: "publish the post",
+        warning: "This action cannot be undone",
+      },
+    });
+    renderHook(() => useSSEConsumer());
+
+    act(() => {
+      MockEventSource.instance?.onmessage?.({
+        data: JSON.stringify({
+          event_type: "task_complete",
+          session_id: "test-session",
+          step_index: null,
+          timestamp: "2024-01-01T00:00:00Z",
+          payload: {},
+        }),
+      } as MessageEvent);
+    });
+
+    expect(useARIAStore.getState().confirmationRequest).toBeNull();
+    expect(useARIAStore.getState().taskStatus).toBe("completed");
+  });
+
+  it("task_failed event clears confirmationRequest", () => {
+    useARIAStore.setState({
+      sessionId: "test-session",
+      confirmationRequest: {
+        step_index: 0,
+        action_description: "make a purchase",
+        warning: "This action cannot be undone",
+      },
+    });
+    renderHook(() => useSSEConsumer());
+
+    act(() => {
+      MockEventSource.instance?.onmessage?.({
+        data: JSON.stringify({
+          event_type: "task_failed",
+          session_id: "test-session",
+          step_index: null,
+          timestamp: "2024-01-01T00:00:00Z",
+          payload: { reason: "some_error" },
+        }),
+      } as MessageEvent);
+    });
+
+    expect(useARIAStore.getState().confirmationRequest).toBeNull();
+    expect(useARIAStore.getState().taskStatus).toBe("failed");
+  });
 });

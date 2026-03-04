@@ -5,6 +5,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { StepItem } from "./StepItem";
 import { InputRequestBanner } from "./InputRequestBanner";
 import { AuditLogEntry } from "./AuditLogEntry";
+import { ConfirmActionDialog } from "./ConfirmActionDialog";
 import { useARIAStore } from "@/lib/store/aria-store";
 import { useFirestoreSession } from "@/lib/hooks/useFirestoreSession";
 
@@ -16,6 +17,7 @@ export function ThinkingPanel() {
   const awaitingInputMessage = useARIAStore((state) => state.awaitingInputMessage);
   const sessionId = useARIAStore((state) => state.sessionId);
   const auditLog = useARIAStore((state) => state.auditLog);
+  const confirmationRequest = useARIAStore((state) => state.confirmationRequest);
   const viewportRef = useRef<HTMLDivElement>(null);
   const prevActiveIndexRef = useRef<number | null>(null);
 
@@ -44,6 +46,8 @@ export function ThinkingPanel() {
       ? `${headerBase} text-confidence-low`
       : panelStatus === "awaiting_input"
       ? `${headerBase} text-amber-400`
+      : panelStatus === "awaiting_confirmation"
+      ? `${headerBase} text-rose-400`
       : headerBase;
 
   const headerLabel =
@@ -53,6 +57,8 @@ export function ThinkingPanel() {
       ? "Failed"
       : panelStatus === "awaiting_input"
       ? "Awaiting Input"
+      : panelStatus === "awaiting_confirmation"
+      ? "Awaiting Confirmation"
       : "Thinking";
 
   return (
@@ -130,6 +136,19 @@ export function ThinkingPanel() {
           )}
         </ScrollArea>
       </div>
+      {confirmationRequest && sessionId && (
+        <ConfirmActionDialog
+          request={confirmationRequest}
+          sessionId={sessionId}
+          onDismiss={() =>
+            useARIAStore.setState({
+              confirmationRequest: null,
+              taskStatus: "paused",
+              panelStatus: "paused",
+            })
+          }
+        />
+      )}
     </div>
   );
 }

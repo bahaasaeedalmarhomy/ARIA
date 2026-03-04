@@ -17,6 +17,7 @@ export type ThinkingPanelStatus =
   | "plan_ready"
   | "executing"
   | "awaiting_input"
+  | "awaiting_confirmation"
   | "paused"
   | "complete"
   | "failed";
@@ -70,6 +71,13 @@ export interface StartTaskData {
     task_summary: string;
     steps: PlanStep[];
   };
+}
+
+// Story 4.5: Destructive action confirmation request
+export interface ConfirmationRequest {
+  step_index: number;
+  action_description: string;
+  warning: string;
 }
 
 export interface StartTaskResponse {

@@ -133,6 +133,7 @@ function handleSSEEvent(event: SSEEvent) {
         taskStatus: "completed",
         panelStatus: "complete",
         awaitingInputMessage: null,
+        confirmationRequest: null,
       });
       break;
     }
@@ -146,6 +147,7 @@ function handleSSEEvent(event: SSEEvent) {
           ? "Task cancelled by user"
           : (payload.error ?? payload.reason ?? "Task failed"),
         awaitingInputMessage: null,
+        confirmationRequest: null,
       });
       break;
     }
@@ -167,6 +169,24 @@ function handleSSEEvent(event: SSEEvent) {
         state.taskStatus = "paused";
         state.panelStatus = "paused";
         state.voiceStatus = "paused"; // triggers BargeInPulse + violet waveform (Story 4.3)
+        state.confirmationRequest = null; // clear any pending confirmation dialog
+      });
+      break;
+    }
+    case "awaiting_confirmation": {
+      const payload = event.payload as {
+        step_index: number;
+        action_description: string;
+        warning: string;
+      };
+      useARIAStore.setState({
+        taskStatus: "awaiting_confirmation",
+        panelStatus: "awaiting_confirmation",
+        confirmationRequest: {
+          step_index: payload.step_index,
+          action_description: payload.action_description,
+          warning: payload.warning,
+        },
       });
       break;
     }

@@ -58,6 +58,22 @@ async def drain_queue_to_gemini(
         await gemini_session.send(input=chunk, end_of_turn=False)
 
 
+async def inject_tts_to_gemini(
+    tts_queue: asyncio.Queue,
+    gemini_session,
+) -> None:
+    """Forward text-to-speech requests to Gemini Live as text turns (Story 4.5).
+
+    Gemini Live synthesizes TTS audio from the text and returns it as audio
+    response bytes, which relay_gemini_to_browser() forwards to the browser.
+    """
+    while True:
+        text = await tts_queue.get()
+        if text is None:
+            break
+        await gemini_session.send(input=text, end_of_turn=True)
+
+
 async def relay_gemini_to_browser(
     ws: WebSocket,
     gemini_session,
@@ -69,14 +85,29 @@ async def relay_gemini_to_browser(
     voice_instruction_service queue via try_put_instruction(). The queue only
     exists during a barge-in pause (created by executor_service), so
     transcriptions during normal execution are silently dropped.
+
+    Additionally detects confirmation keywords while a destructive action guard
+    is active (Story 4.5) and delivers confirmation to the executor.
     """
+    CONFIRM_WORDS = frozenset({"yes", "confirm", "proceed", "go ahead", "do it"})
+    DENY_WORDS = frozenset({"no", "cancel", "stop", "don't", "abort", "halt", "nope", "negative"})
+
     async for response in gemini_session.receive():
         if response.data:
             await ws.send_bytes(response.data)
-        # Capture transcription ONLY when session is paused (barge-in mode)
         if response.text:
             from services.voice_instruction_service import try_put_instruction  # lazy import
             try_put_instruction(session_id, response.text)
+            # Voice confirmation detection (Story 4.5)
+            from services.confirmation_queue_service import has_confirmation_queue, deliver_confirmation  # lazy import
+            if has_confirmation_queue(session_id):
+                text_normalized = response.text.strip().lower()
+                is_confirm = any(text_normalized.startswith(w) for w in CONFIRM_WORDS)
+                is_deny = any(text_normalized.startswith(w) for w in DENY_WORDS)
+                if is_confirm and not is_deny:
+                    deliver_confirmation(session_id, True)
+                elif is_deny:
+                    deliver_confirmation(session_id, False)
 
 
 # ---------------------------------------------------------------------------
@@ -94,6 +125,9 @@ async def audio_relay(websocket: WebSocket, session_id: str) -> None:
 
     await websocket.accept()
     inbound_queue = create_audio_queue(session_id)
+
+    from services.tts_queue_service import create_tts_queue, release_tts_queue  # lazy import
+    tts_queue = create_tts_queue(session_id)
 
     voice_model = os.getenv("VOICE_MODEL", "gemini-2.0-flash-live-001")
     api_key = os.getenv("GEMINI_API_KEY")
@@ -121,6 +155,7 @@ async def audio_relay(websocket: WebSocket, session_id: str) -> None:
                 asyncio.create_task(relay_inbound_to_queue(websocket, inbound_queue)),
                 asyncio.create_task(drain_queue_to_gemini(inbound_queue, gemini_session)),
                 asyncio.create_task(relay_gemini_to_browser(websocket, gemini_session, session_id)),
+                asyncio.create_task(inject_tts_to_gemini(tts_queue, gemini_session)),  # Story 4.5
             ]
             # On disconnect, relay_inbound_to_queue raises WebSocketDisconnect
             # which propagates immediately (no return_exceptions) so finally
@@ -131,9 +166,12 @@ async def audio_relay(websocket: WebSocket, session_id: str) -> None:
     except Exception as exc:  # noqa: BLE001
         logger.warning("Voice relay error for session %s: %s", session_id, exc)
     finally:
+        # Signal inject_tts_to_gemini to stop (Story 4.5)
+        tts_queue.put_nowait(None)
         # Belt-and-suspenders: ensure drain can exit if not already signalled
         inbound_queue.put_nowait(None)
         for task in tasks:
             if not task.done():
                 task.cancel()
         release_audio_queue(session_id)
+        release_tts_queue(session_id)  # Story 4.5

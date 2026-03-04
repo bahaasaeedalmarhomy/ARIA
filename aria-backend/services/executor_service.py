@@ -10,6 +10,7 @@ SSE events emitted by this module:
   - step_error       : Step fails after 2 retries (exhausted) — waits for user input before continuing
   - task_failed      : Unrecoverable executor error (Gemini API exhausted, input wait timeout)
   - awaiting_input   : CAPTCHA detected or step failed — execution paused for user input
+  - awaiting_confirmation : Destructive action guard — waiting for user confirmation (Story 4.5)
 """
 import asyncio
 import base64
@@ -28,7 +29,7 @@ from handlers.audit_writer import write_audit_log
 from prompts.executor_system import EXECUTOR_SYSTEM_PROMPT
 from services.gcs_service import upload_screenshot
 from services.input_queue_service import clear_input_queue, get_input_queue
-from services.session_service import update_session_status, is_user_cancel, clear_user_cancel_flag, set_paused_step
+from services.session_service import update_session_status, is_user_cancel, clear_user_cancel_flag, set_paused_step, get_cancel_flag
 from services.sse_service import emit_event
 from services.task_complete_service import handle_task_complete
 from tools.playwright_computer import BargeInException, PlaywrightComputer
@@ -193,6 +194,42 @@ async def run_executor(session_id: str, step_plan: dict, existing_pc: Playwright
                 },
                 step_index=current_step_index,
             )
+
+            # Destructive action guard (Story 4.5 AC: 1, 5, 7)
+            if step.get("is_destructive", False):
+                action_description = step_description
+                emit_event(session_id, "awaiting_confirmation", {
+                    "step_index": current_step_index,
+                    "action_description": action_description,
+                    "warning": "This action cannot be undone",
+                }, step_index=current_step_index)
+                await update_session_status(session_id, "awaiting_confirmation")
+                # Inject TTS confirmation prompt into Gemini Live (FR30) — best-effort
+                from services.tts_queue_service import try_put_tts_text  # deferred import
+                try_put_tts_text(
+                    session_id,
+                    f"I'm about to {action_description}. This action cannot be undone — shall I proceed?"
+                )
+                # Create queue and wait (max 60s)
+                from services.confirmation_queue_service import (
+                    create_confirmation_queue, wait_for_confirmation, release_confirmation_queue
+                )  # deferred import
+                create_confirmation_queue(session_id)
+                confirmed = await wait_for_confirmation(session_id, timeout=60.0)
+                release_confirmation_queue(session_id)
+                if confirmed is None or not confirmed:
+                    # Timeout or explicit cancel — safe default: do NOT execute
+                    emit_event(session_id, "task_paused", {
+                        "paused_at_step": current_step_index,
+                        "reason": "destructive_action_cancelled",
+                    })
+                    await update_session_status(session_id, "paused")
+                    return
+                # Check for barge-in that arrived during confirmation wait
+                if get_cancel_flag(session_id).is_set():
+                    raise BargeInException("Barge-in during destructive confirmation")
+                # User confirmed — restore executing status and proceed
+                await update_session_status(session_id, "executing")
 
             step_resolved = False
             while not step_resolved:
@@ -541,6 +578,8 @@ async def run_executor(session_id: str, step_plan: dict, existing_pc: Playwright
             await pc.stop()  # Clean up browser resources (skipped on barge-in to preserve state)
         clear_input_queue(session_id)  # Clean up per-session input queue (AC: 4)
         clear_user_cancel_flag(session_id)  # Safety net: clear user-cancel flag (idempotent)
+        from services.confirmation_queue_service import release_confirmation_queue  # deferred import
+        release_confirmation_queue(session_id)  # Safety net: clean up confirmation queue (Story 4.5)
 
     if success:
         try:

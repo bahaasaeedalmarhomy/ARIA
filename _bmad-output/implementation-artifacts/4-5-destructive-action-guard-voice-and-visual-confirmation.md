@@ -1,6 +1,6 @@
 # Story 4.5: Destructive Action Guard — Voice and Visual Confirmation
 
-Status: ready-for-dev
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -30,23 +30,23 @@ so that I am never surprised by an irreversible action I didn't intend.
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Create `aria-backend/services/confirmation_queue_service.py` (AC: 1, 5, 6, 7)
-  - [ ] Implement `create_confirmation_queue(session_id: str) -> asyncio.Queue[bool]`
-  - [ ] Implement `deliver_confirmation(session_id: str, confirmed: bool) -> None` — non-blocking `put_nowait`
-  - [ ] Implement `wait_for_confirmation(session_id: str, timeout: float = 60.0) -> bool | None` — returns `None` on timeout
-  - [ ] Implement `release_confirmation_queue(session_id: str) -> None` — pops from `_confirmation_queues` dict
-  - [ ] Implement `has_confirmation_queue(session_id: str) -> bool`
-  - [ ] Pattern: mirror `input_queue_service.py` exactly (dict of `asyncio.Queue[bool]`)
+- [x] Task 1: Create `aria-backend/services/confirmation_queue_service.py` (AC: 1, 5, 6, 7)
+  - [x] Implement `create_confirmation_queue(session_id: str) -> asyncio.Queue[bool]`
+  - [x] Implement `deliver_confirmation(session_id: str, confirmed: bool) -> None` — non-blocking `put_nowait`
+  - [x] Implement `wait_for_confirmation(session_id: str, timeout: float = 60.0) -> bool | None` — returns `None` on timeout
+  - [x] Implement `release_confirmation_queue(session_id: str) -> None` — pops from `_confirmation_queues` dict
+  - [x] Implement `has_confirmation_queue(session_id: str) -> bool`
+  - [x] Pattern: mirror `input_queue_service.py` exactly (dict of `asyncio.Queue[bool]`)
 
-- [ ] Task 2: Create `aria-backend/services/tts_queue_service.py` (AC: 3)
-  - [ ] Implement `create_tts_queue(session_id: str) -> asyncio.Queue[str | None]`
-  - [ ] Implement `try_put_tts_text(session_id: str, text: str) -> None` — non-blocking, silently drops if no queue exists
-  - [ ] Implement `get_tts_text(session_id: str) -> asyncio.Queue[str | None] | None` — returns the queue or `None`
-  - [ ] Implement `release_tts_queue(session_id: str) -> None`
-  - [ ] Pattern: same dict-of-queues pattern as `voice_instruction_service.py`
+- [x] Task 2: Create `aria-backend/services/tts_queue_service.py` (AC: 3)
+  - [x] Implement `create_tts_queue(session_id: str) -> asyncio.Queue[str | None]`
+  - [x] Implement `try_put_tts_text(session_id: str, text: str) -> None` — non-blocking, silently drops if no queue exists
+  - [x] Implement `get_tts_text(session_id: str) -> asyncio.Queue[str | None] | None` — returns the queue or `None`
+  - [x] Implement `release_tts_queue(session_id: str) -> None`
+  - [x] Pattern: same dict-of-queues pattern as `voice_instruction_service.py`
 
-- [ ] Task 3: Add `is_destructive` guard to `aria-backend/services/executor_service.py` (AC: 1, 5, 7)
-  - [ ] In the step loop, AFTER `step_start` is emitted but BEFORE the attempt/retry loop, add:
+- [x] Task 3: Add `is_destructive` guard to `aria-backend/services/executor_service.py` (AC: 1, 5, 7)
+  - [x] In the step loop, AFTER `step_start` is emitted but BEFORE the attempt/retry loop, add:
     ```python
     # Destructive action guard (Story 4.5)
     if step.get("is_destructive", False):
@@ -81,21 +81,21 @@ so that I am never surprised by an irreversible action I didn't intend.
         # User confirmed — restore executing status and proceed
         await update_session_status(session_id, "executing")
     ```
-  - [ ] Add `release_confirmation_queue` call in the `finally` block (after `clear_input_queue`) for safety
-  - [ ] `BargeInException` must still propagate through the destructive guard — if a barge-in arrives while waiting for confirmation, the `BargeInException` pathway must fire. (Note: `asyncio.wait_for` inside `wait_for_confirmation` will be interrupted when the cancel flag sets via a separate cancel mechanism — ensure the existing `_check_cancel()` mechanism is covered OR use a separate task that reads barge-in cancellation. See Dev Notes.)
+  - [x] Add `release_confirmation_queue` call in the `finally` block (after `clear_input_queue`) for safety
+  - [x] `BargeInException` must still propagate through the destructive guard — if a barge-in arrives while waiting for confirmation, the `BargeInException` pathway must fire. (Note: `asyncio.wait_for` inside `wait_for_confirmation` will be interrupted when the cancel flag sets via a separate cancel mechanism — ensure the existing `_check_cancel()` mechanism is covered OR use a separate task that reads barge-in cancellation. See Dev Notes.)
 
-- [ ] Task 4: Add `POST /{session_id}/confirm` endpoint to `aria-backend/routers/task_router.py` (AC: 5, 6)
-  - [ ] Add `ConfirmRequest` Pydantic model: `confirmed: bool`
-  - [ ] Add `@router.post("/{session_id}/confirm")` handler:
+- [x] Task 4: Add `POST /{session_id}/confirm` endpoint to `aria-backend/routers/task_router.py` (AC: 5, 6)
+  - [x] Add `ConfirmRequest` Pydantic model: `confirmed: bool`
+  - [x] Add `@router.post("/{session_id}/confirm")` handler:
     - Import `deliver_confirmation` from `services.confirmation_queue_service`
     - Import `has_confirmation_queue` from `services.confirmation_queue_service`
     - If `not has_confirmation_queue(session_id)`, return `_error_response("CONFIRMATION_NOT_EXPECTED", "No pending confirmation for this session", 404)`
     - Call `deliver_confirmation(session_id, body.confirmed)`
     - Return `JSONResponse(200, {"success": True, "data": {"confirmed": body.confirmed}, "error": None})`
-  - [ ] No auth check — `session_id` (UUID v4) acts as implicit ownership token (consistent with `/interrupt`, `/barge-in`, `/input`)
+  - [x] No auth check — `session_id` (UUID v4) acts as implicit ownership token (consistent with `/interrupt`, `/barge-in`, `/input`)
 
-- [ ] Task 5: Modify `aria-backend/handlers/voice_handler.py` for TTS injection and voice confirmation detection (AC: 3, 4)
-  - [ ] **Add TTS injection task**: Create `inject_tts_to_gemini(tts_queue, gemini_session)` coroutine:
+- [x] Task 5: Modify `aria-backend/handlers/voice_handler.py` for TTS injection and voice confirmation detection (AC: 3, 4)
+  - [x] **Add TTS injection task**: Create `inject_tts_to_gemini(tts_queue, gemini_session)` coroutine:
     ```python
     async def inject_tts_to_gemini(
         tts_queue: asyncio.Queue,
@@ -108,7 +108,7 @@ so that I am never surprised by an irreversible action I didn't intend.
                 break
             await gemini_session.send(input=text, end_of_turn=True)
     ```
-  - [ ] In `audio_relay()`, create TTS queue and add `inject_tts_to_gemini` task:
+  - [x] In `audio_relay()`, create TTS queue and add `inject_tts_to_gemini` task:
     ```python
     from services.tts_queue_service import create_tts_queue, release_tts_queue
     tts_queue = create_tts_queue(session_id)
@@ -119,8 +119,8 @@ so that I am never surprised by an irreversible action I didn't intend.
         asyncio.create_task(inject_tts_to_gemini(tts_queue, gemini_session)),  # NEW
     ]
     ```
-  - [ ] In the `finally` block, signal `inject_tts_to_gemini` to stop: `tts_queue.put_nowait(None)` and call `release_tts_queue(session_id)`
-  - [ ] **Extend `relay_gemini_to_browser()`** to detect confirmation keywords in `response.text`:
+  - [x] In the `finally` block, signal `inject_tts_to_gemini` to stop: `tts_queue.put_nowait(None)` and call `release_tts_queue(session_id)`
+  - [x] **Extend `relay_gemini_to_browser()`** to detect confirmation keywords in `response.text`:
     ```python
     if response.text:
         from services.voice_instruction_service import try_put_instruction
@@ -138,9 +138,9 @@ so that I am never surprised by an irreversible action I didn't intend.
                 deliver_confirmation(session_id, False)
     ```
 
-- [ ] Task 6: Update `aria-frontend/src/types/aria.ts` (AC: 2)
-  - [ ] Add `"awaiting_confirmation"` to `ThinkingPanelStatus` union (note: `TaskStatus` already has it)
-  - [ ] Add `ConfirmationRequest` interface:
+- [x] Task 6: Update `aria-frontend/src/types/aria.ts` (AC: 2)
+  - [x] Add `"awaiting_confirmation"` to `ThinkingPanelStatus` union (note: `TaskStatus` already has it)
+  - [x] Add `ConfirmationRequest` interface:
     ```typescript
     export interface ConfirmationRequest {
       step_index: number;
@@ -149,13 +149,13 @@ so that I am never surprised by an irreversible action I didn't intend.
     }
     ```
 
-- [ ] Task 7: Update `aria-frontend/src/lib/store/aria-store.ts` (AC: 2)
-  - [ ] Import `ConfirmationRequest` from `@/types/aria`
-  - [ ] Add `confirmationRequest: ConfirmationRequest | null` field to `ThinkingPanelSlice`
-  - [ ] Add `confirmationRequest: null` to `ARIA_INITIAL_STATE`
+- [x] Task 7: Update `aria-frontend/src/lib/store/aria-store.ts` (AC: 2)
+  - [x] Import `ConfirmationRequest` from `@/types/aria`
+  - [x] Add `confirmationRequest: ConfirmationRequest | null` field to `ThinkingPanelSlice`
+  - [x] Add `confirmationRequest: null` to `ARIA_INITIAL_STATE`
 
-- [ ] Task 8: Add `awaiting_confirmation` SSE case to `aria-frontend/src/lib/hooks/useSSEConsumer.ts` (AC: 2, 5)
-  - [ ] Add case in `handleSSEEvent()` switch (after `task_paused`):
+- [x] Task 8: Add `awaiting_confirmation` SSE case to `aria-frontend/src/lib/hooks/useSSEConsumer.ts` (AC: 2, 5)
+  - [x] Add case in `handleSSEEvent()` switch (after `task_paused`):
     ```typescript
     case "awaiting_confirmation": {
       const payload = event.payload as {
@@ -175,26 +175,26 @@ so that I am never surprised by an irreversible action I didn't intend.
       break;
     }
     ```
-  - [ ] Note: `task_paused` case already exists — ensures dialog dismisses by setting `confirmationRequest: null` inside the `task_paused` case (add `state.confirmationRequest = null;`). Also add `state.confirmationRequest = null;` to `task_complete`, `task_failed` cases.
+  - [x] Note: `task_paused` case already exists — ensures dialog dismisses by setting `confirmationRequest: null` inside the `task_paused` case (add `state.confirmationRequest = null;`). Also add `state.confirmationRequest = null;` to `task_complete`, `task_failed` cases.
 
-- [ ] Task 9: Create `aria-frontend/src/components/thinking-panel/ConfirmActionDialog.tsx` (AC: 2, 6)
-  - [ ] Props: `{ request: ConfirmationRequest; sessionId: string; onDismiss: () => void }`
-  - [ ] Layout: modal overlay (`fixed inset-0 bg-black/60 flex items-center justify-center z-50`)
-  - [ ] Inner card: `bg-zinc-900 border border-rose-500/50 rounded-lg p-6 max-w-md w-full shadow-xl`
-  - [ ] Rose warning banner: `<div className="bg-rose-500/10 border border-rose-500/30 rounded px-3 py-2 mb-4 flex items-center gap-2 text-rose-400 text-sm">⚠️ {request.warning}</div>`
-  - [ ] Action description: `<p className="text-text-primary text-sm mb-6">{request.action_description}</p>`
-  - [ ] Buttons row: `<div className="flex gap-3 justify-end">`
+- [x] Task 9: Create `aria-frontend/src/components/thinking-panel/ConfirmActionDialog.tsx` (AC: 2, 6)
+  - [x] Props: `{ request: ConfirmationRequest; sessionId: string; onDismiss: () => void }`
+  - [x] Layout: modal overlay (`fixed inset-0 bg-black/60 flex items-center justify-center z-50`)
+  - [x] Inner card: `bg-zinc-900 border border-rose-500/50 rounded-lg p-6 max-w-md w-full shadow-xl`
+  - [x] Rose warning banner: `<div className="bg-rose-500/10 border border-rose-500/30 rounded px-3 py-2 mb-4 flex items-center gap-2 text-rose-400 text-sm">⚠️ {request.warning}</div>`
+  - [x] Action description: `<p className="text-text-primary text-sm mb-6">{request.action_description}</p>`
+  - [x] Buttons row: `<div className="flex gap-3 justify-end">`
     - Cancel button: `bg-zinc-800 text-text-secondary hover:bg-zinc-700`, calls `handleDecline()`
     - Confirm button: `bg-rose-600 text-white hover:bg-rose-700`, calls `handleConfirm()`
-  - [ ] `handleConfirm()`: `POST ${BACKEND_URL}/api/task/${sessionId}/confirm` with body `{confirmed: true}`, then `onDismiss()`
-  - [ ] `handleDecline()`: `POST ${BACKEND_URL}/api/task/${sessionId}/confirm` with body `{confirmed: false}`, then `onDismiss()`
-  - [ ] Keyboard: `onKeyDown` handler on the modal — `Enter` → `handleConfirm()`, `Escape` → `handleDecline()`; add `role="dialog"`, `aria-modal="true"`, `aria-label="Confirm Action"` for accessibility
-  - [ ] `autoFocus` on Cancel button (safer default per UX spec and FR32)
-  - [ ] Import `BACKEND_URL` from `@/lib/constants` (already exists from Story 4.4)
+  - [x] `handleConfirm()`: `POST ${BACKEND_URL}/api/task/${sessionId}/confirm` with body `{confirmed: true}`, then `onDismiss()`
+  - [x] `handleDecline()`: `POST ${BACKEND_URL}/api/task/${sessionId}/confirm` with body `{confirmed: false}`, then `onDismiss()`
+  - [x] Keyboard: `onKeyDown` handler on the modal — `Enter` → `handleConfirm()`, `Escape` → `handleDecline()`; add `role="dialog"`, `aria-modal="true"`, `aria-label="Confirm Action"` for accessibility
+  - [x] `autoFocus` on Cancel button (safer default per UX spec and FR32)
+  - [x] Import `BACKEND_URL` from `@/lib/constants` (already exists from Story 4.4)
 
-- [ ] Task 10: Integrate `ConfirmActionDialog` into `aria-frontend/src/components/thinking-panel/ThinkingPanel.tsx` (AC: 2)
-  - [ ] Add `confirmationRequest` and `sessionId` to store reads at component top
-  - [ ] Render dialog just before the closing `</div>` of the outer container:
+- [x] Task 10: Integrate `ConfirmActionDialog` into `aria-frontend/src/components/thinking-panel/ThinkingPanel.tsx` (AC: 2)
+  - [x] Add `confirmationRequest` and `sessionId` to store reads at component top
+  - [x] Render dialog just before the closing `</div>` of the outer container:
     ```tsx
     {confirmationRequest && sessionId && (
       <ConfirmActionDialog
@@ -210,28 +210,29 @@ so that I am never surprised by an irreversible action I didn't intend.
       />
     )}
     ```
-  - [ ] Import `ConfirmActionDialog` from `./ConfirmActionDialog`
-  - [ ] Add `"awaiting_confirmation"` case to the `headerClass` and `headerLabel` logic (rose text `text-rose-400`, label `"Awaiting Confirmation"`)
+  - [x] Import `ConfirmActionDialog` from `./ConfirmActionDialog`
+  - [x] Add `"awaiting_confirmation"` case to the `headerClass` and `headerLabel` logic (rose text `text-rose-400`, label `"Awaiting Confirmation"`)
 
-- [ ] Task 11: Write backend tests in `aria-backend/tests/test_destructive_action_guard.py` (AC: 1, 5, 6, 7)
-  - [ ] Test: `POST /api/task/{session_id}/confirm` with `{"confirmed": true}` returns 200 and delivers confirmation
-  - [ ] Test: `POST /api/task/{session_id}/confirm` with `{"confirmed": false}` returns 200 and delivers cancellation
-  - [ ] Test: `POST /api/task/{session_id}/confirm` returns 404 when no confirmation queue exists
-  - [ ] Test: `wait_for_confirmation()` returns `None` after timeout (60s)
-  - [ ] Test: Executor emits `awaiting_confirmation` SSE and does NOT execute step when `is_destructive: True` — use executor test mock pattern from `test_executor_service.py`
-  - [ ] Test: Executor emits `task_paused` with `reason: "destructive_action_cancelled"` when `confirmed=False`
-  - [ ] Test: Executor proceeds to execute step when `confirmed=True`
-  - [ ] Test: `confirmation_queue_service` — `create`, `deliver`, `wait_for` cycle completes correctly
+- [x] Task 11: Write backend tests in `aria-backend/tests/test_destructive_action_guard.py` (AC: 1, 5, 6, 7)
+  - [x] Test: `POST /api/task/{session_id}/confirm` with `{"confirmed": true}` returns 200 and delivers confirmation
+  - [x] Test: `POST /api/task/{session_id}/confirm` with `{"confirmed": false}` returns 200 and delivers cancellation
+  - [x] Test: `POST /api/task/{session_id}/confirm` returns 404 when no confirmation queue exists
+  - [x] Test: `wait_for_confirmation()` returns `None` after timeout (60s)
+  - [x] Test: Executor emits `awaiting_confirmation` SSE and does NOT execute step when `is_destructive: True` — use executor test mock pattern from `test_executor_service.py`
+  - [x] Test: Executor emits `task_paused` with `reason: "destructive_action_cancelled"` when `confirmed=False`
+  - [x] Test: Executor proceeds to execute step when `confirmed=True`
+  - [x] Test: `confirmation_queue_service` — `create`, `deliver`, `wait_for` cycle completes correctly
+  - [x] Test: Executor handles barge-in during destructive confirmation — cancel flag set after confirm triggers `task_paused` (review fix)
 
-- [ ] Task 12: Write frontend tests (AC: 2, 6)
-  - [ ] `aria-frontend/src/components/thinking-panel/ConfirmActionDialog.test.tsx` (CREATE):
+- [x] Task 12: Write frontend tests (AC: 2, 6)
+  - [x] `aria-frontend/src/components/thinking-panel/ConfirmActionDialog.test.tsx` (CREATE):
     - Renders dialog with action description and rose warning banner
     - "Confirm" button calls POST `/confirm` with `{confirmed: true}` and calls `onDismiss`
     - "Cancel" button calls POST `/confirm` with `{confirmed: false}` and calls `onDismiss`
     - Enter keypress triggers confirm
     - Escape keypress triggers decline
     - Cancel button has autoFocus
-  - [ ] `aria-frontend/src/lib/hooks/useSSEConsumer.test.ts` (EXTEND):
+  - [x] `aria-frontend/src/lib/hooks/useSSEConsumer.test.ts` (EXTEND):
     - `awaiting_confirmation` event sets `taskStatus: "awaiting_confirmation"`, `panelStatus: "awaiting_confirmation"`, and populates `confirmationRequest`
     - `task_paused` event clears `confirmationRequest`
     - `task_complete` event clears `confirmationRequest`
@@ -577,10 +578,42 @@ Neither count includes Story 4.5 tests yet. Expected delta: +8 backend tests, +1
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
+Claude Sonnet 4.6 (GitHub Copilot)
 
 ### Debug Log References
 
+- Fixed unused import `get_events_for_session` in test_destructive_action_guard.py (not exported from sse_service)
+
 ### Completion Notes List
 
+- ✅ Task 1: Created `confirmation_queue_service.py` — bounded `asyncio.Queue[bool]` with create/deliver/wait/release/has API, mirrors `input_queue_service.py`
+- ✅ Task 2: Created `tts_queue_service.py` — unbounded `asyncio.Queue[str | None]` with create/try_put/release API, mirrors `voice_instruction_service.py`
+- ✅ Task 3: Added `is_destructive` guard in `executor_service.py` after `step_start` emit, before attempt loop; includes barge-in cancel flag check after confirmation; `release_confirmation_queue` added to `finally` block
+- ✅ Task 4: Added `POST /{session_id}/confirm` endpoint and `ConfirmRequest` Pydantic model to `task_router.py`; returns 404 when no queue exists
+- ✅ Task 5: Updated `voice_handler.py` — added `inject_tts_to_gemini()` coroutine, extended `relay_gemini_to_browser()` with CONFIRM_WORDS/DENY_WORDS keyword detection, added TTS queue lifecycle in `audio_relay()` and `finally` block
+- ✅ Task 6: Added `"awaiting_confirmation"` to `ThinkingPanelStatus` union and `ConfirmationRequest` interface in `aria.ts`
+- ✅ Task 7: Added `ConfirmationRequest` import and `confirmationRequest: ConfirmationRequest | null` to `ThinkingPanelSlice` and `ARIA_INITIAL_STATE` in `aria-store.ts`
+- ✅ Task 8: Added `awaiting_confirmation` SSE case in `useSSEConsumer.ts`; cleared `confirmationRequest` in `task_paused`, `task_complete`, `task_failed` cases
+- ✅ Task 9: Created `ConfirmActionDialog.tsx` — rose-styled modal with keyboard navigation (Enter=confirm, Escape=cancel), autoFocus on Cancel, ARIA accessibility attributes, POST to `/confirm` endpoint
+- ✅ Task 10: Integrated `ConfirmActionDialog` into `ThinkingPanel.tsx` — added header class/label for `awaiting_confirmation`, dialog render with `onDismiss` callback
+- ✅ Task 11: Created `test_destructive_action_guard.py` — 9 tests, all passing; Backend total: 197 (was 188)
+- ✅ Task 12: Created `ConfirmActionDialog.test.tsx` (7 tests) and extended `useSSEConsumer.test.ts` (4 tests); Frontend total: 189 (was 178)
+
 ### File List
+
+**New files:**
+- `aria-backend/services/confirmation_queue_service.py`
+- `aria-backend/services/tts_queue_service.py`
+- `aria-backend/tests/test_destructive_action_guard.py`
+- `aria-frontend/src/components/thinking-panel/ConfirmActionDialog.tsx`
+- `aria-frontend/src/components/thinking-panel/ConfirmActionDialog.test.tsx`
+
+**Modified files:**
+- `aria-backend/services/executor_service.py`
+- `aria-backend/handlers/voice_handler.py`
+- `aria-backend/routers/task_router.py`
+- `aria-frontend/src/types/aria.ts`
+- `aria-frontend/src/lib/store/aria-store.ts`
+- `aria-frontend/src/lib/hooks/useSSEConsumer.ts`
+- `aria-frontend/src/components/thinking-panel/ThinkingPanel.tsx`
+- `aria-frontend/src/lib/hooks/useSSEConsumer.test.ts`

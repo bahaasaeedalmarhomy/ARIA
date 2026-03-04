@@ -12,6 +12,7 @@ from services.planner_service import run_planner
 from services.session_service import create_session, update_session_status, get_cancel_flag, set_user_cancel_flag, signal_barge_in
 from services.sse_service import emit_event
 from services.input_queue_service import has_input_queue, put_user_input
+from services.confirmation_queue_service import has_confirmation_queue, deliver_confirmation
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +21,10 @@ router = APIRouter(prefix="/api/task")
 
 class UserInputRequest(BaseModel):
     value: str = Field(..., min_length=1)
+
+
+class ConfirmRequest(BaseModel):
+    confirmed: bool
 
 
 class StartTaskRequest(BaseModel):
@@ -244,4 +249,30 @@ async def submit_user_input(session_id: str, body: UserInputRequest):
     return JSONResponse(
         status_code=200,
         content={"success": True, "data": {"queued": True}, "error": None},
+    )
+
+
+@router.post("/{session_id}/confirm")
+async def confirm_action(session_id: str, body: ConfirmRequest):
+    """
+    POST /api/task/{session_id}/confirm
+
+    Delivers the user's confirmation decision (confirmed: true/false) to the
+    executor waiting on a destructive action guard.
+
+    No auth check — session_id (UUID v4) acts as implicit ownership token,
+    consistent with /interrupt, /barge-in, and /input endpoints.
+
+    Returns 404 if no confirmation queue exists (executor not waiting).
+    """
+    if not has_confirmation_queue(session_id):
+        return _error_response(
+            "CONFIRMATION_NOT_EXPECTED",
+            "No pending confirmation for this session",
+            404,
+        )
+    deliver_confirmation(session_id, body.confirmed)
+    return JSONResponse(
+        status_code=200,
+        content={"success": True, "data": {"confirmed": body.confirmed}, "error": None},
     )
